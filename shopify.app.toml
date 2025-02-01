@@ -1,0 +1,36 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "769d7b3b0d233f22f819e8a9f853c1be"
+application_url = "https://interactions-lewis-shaft-officer.trycloudflare.com"
+embedded = true
+name = "consumer-app"
+handle = "consumer-app-4"
+
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products"
+
+[auth]
+redirect_urls = [
+  "https://interactions-lewis-shaft-officer.trycloudflare.com/auth/callback",
+  "https://interactions-lewis-shaft-officer.trycloudflare.com/auth/shopify/callback",
+  "https://interactions-lewis-shaft-officer.trycloudflare.com/api/auth/callback"
+]
+
+[pos]
+embedded = false
+
+[build]
+dev_store_url = "quickstart-7fb02b5e.myshopify.com"
+automatically_update_urls_on_dev = true
