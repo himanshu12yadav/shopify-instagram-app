@@ -1,6 +1,9 @@
 node_modules
 
 /.cache
+/idea
+/.vscode
+/.shopify
 /build
 /app/build
 /public/build/
