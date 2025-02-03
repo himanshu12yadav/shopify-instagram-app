@@ -9,16 +9,12 @@ import {
   Grid,
   FooterHelp,
   Pagination,
-  Checkbox,
   MediaCard,
   VideoThumbnail,
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
 import { useCallback, useEffect, useState } from "react";
-import {
-  findUserByInstagramUsername,
-  getAllInstagramAccounts,
-} from "../db.server.js";
+
 import {
   Link,
   useActionData,
@@ -29,6 +25,7 @@ import {
 import axios from "axios";
 
 export const loader = async ({ request }) => {
+  const { getAllInstagramAccounts } = await import("../db.server.js");
   const accounts = await getAllInstagramAccounts();
   console.log("accounts: ", accounts);
   return json({ accounts });
@@ -74,6 +71,12 @@ export const SelectComponent = ({ allOption = [], option }) => {
 export const action = async ({ request }) => {
   const formData = await request.formData();
 
+  const {
+    findUserByInstagramUsername,
+    getAllInstagramAccounts,
+    storeInstagramPosts,
+  } = await import("../db.server.js");
+
   // getting formData
   const username = formData.get("username");
 
@@ -82,7 +85,7 @@ export const action = async ({ request }) => {
   if (username) {
     const getDataByUsername = await findUserByInstagramUsername(username);
 
-    // user existing in database
+    // user existing in database and posts length is greater than 0.
     if (getDataByUsername.posts.length > 0) {
       return {
         data: getDataByUsername,
@@ -96,14 +99,25 @@ export const action = async ({ request }) => {
       `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
     );
 
-    const data = response.data;
-    console.log(data);
+    const posts = response.data.data;
+
+    // save data in database
+    const postCreate = await storeInstagramPosts(
+      posts,
+      getDataByUsername.instagramId,
+    );
+
+    // return it
+    if (Object.keys(postCreate).length > 0) {
+      return {
+        data: responseData,
+      };
+    }
+  } else {
     return {
-      data: response.data,
+      error: "Please connect before getting a post.",
     };
   }
-
-  return null;
 };
 
 export default function Index() {
@@ -123,14 +137,14 @@ export default function Index() {
 
   useEffect(() => {
     setUserData(actionData?.data);
-  }, [actionData, userData]);
+  }, [actionData]);
 
   useEffect(() => {
     submit({ username: selected }, { method: "POST" });
   }, [selected]);
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://surfing-brisbane-electrical-third.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://slovakia-vp-mr-glance.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const handleConnect = () => {
     window.top.location.href = instagramUrl;

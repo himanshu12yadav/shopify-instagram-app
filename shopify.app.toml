@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "769d7b3b0d233f22f819e8a9f853c1be"
-application_url = "https://interactions-lewis-shaft-officer.trycloudflare.com"
+application_url = "https://slovakia-vp-mr-glance.trycloudflare.com"
 embedded = true
 name = "consumer-app"
 handle = "consumer-app-4"
@@ -23,9 +23,10 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://interactions-lewis-shaft-officer.trycloudflare.com/auth/callback",
-  "https://interactions-lewis-shaft-officer.trycloudflare.com/auth/shopify/callback",
-  "https://interactions-lewis-shaft-officer.trycloudflare.com/api/auth/callback"
+  "https://slovakia-vp-mr-glance.trycloudflare.com/auth/callback",
+  "https://slovakia-vp-mr-glance.trycloudflare.com/auth/shopify/callback",
+  "https://slovakia-vp-mr-glance.trycloudflare.com/api/auth/callback",
+  "https://slovakia-vp-mr-glance.trycloudflare.com/auth/instagram/callback",
 ]
 
 [pos]

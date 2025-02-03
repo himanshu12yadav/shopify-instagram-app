@@ -44,7 +44,7 @@ model InstagramAccount {
 }
 
 model InstagramPost {
-  id           String   @id
+  id           String   @id @default(uuid()) // Ensure id has a default UUID for SQLite compatibility
   mediaType    String
   mediaUrl     String
   thumbnailUrl String?

@@ -18,7 +18,7 @@ export const loader = async ({ request }) => {
       client_secret: "33f126ed6da9cf78907abb35ca28c22e",
       grant_type: "authorization_code",
       redirect_uri:
-        "https://surfing-brisbane-electrical-third.trycloudflare.com/auth/instagram/callback",
+        "https://slovakia-vp-mr-glance.trycloudflare.com/auth/instagram/callback",
       code,
     });
 
@@ -75,7 +75,12 @@ export const loader = async ({ request }) => {
     // Redirect to the app or any other page after successful authentication
 
     if (Object.keys(result).length > 0) {
-      return redirect("/app");
+      return redirect(
+        `https://admin.shopify.com/store/quickstart-7fb02b5e/apps/consumer-app-4/app`,
+        {
+          status: 302,
+        },
+      );
     } else {
       return json(
         { error: "Failed to authenticate with Instagram" },

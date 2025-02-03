@@ -17,6 +17,7 @@ import { loginErrorMessage } from "./error.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
+  console.log("request: ", request);
   const errors = loginErrorMessage(await login(request));
 
   return { errors, polarisTranslations };
