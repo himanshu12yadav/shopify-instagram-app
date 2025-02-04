@@ -11,9 +11,14 @@ import {
   Pagination,
   MediaCard,
   VideoThumbnail,
+  Checkbox,
+  InlineStack,
+  Badge,
+  Box,
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
 import { useCallback, useEffect, useState } from "react";
+import { Modal } from "@shopify/app-bridge-react";
 
 import {
   Link,
@@ -71,11 +76,9 @@ export const SelectComponent = ({ allOption = [], option }) => {
 export const action = async ({ request }) => {
   const formData = await request.formData();
 
-  const {
-    findUserByInstagramUsername,
-    getAllInstagramAccounts,
-    storeInstagramPosts,
-  } = await import("../db.server.js");
+  const { findUserByInstagramUsername, storeInstagramPosts } = await import(
+    "../db.server.js"
+  );
 
   // getting formData
   const username = formData.get("username");
@@ -102,36 +105,35 @@ export const action = async ({ request }) => {
     const posts = response.data.data;
 
     // save data in database
-    const postCreate = await storeInstagramPosts(
-      posts,
-      getDataByUsername.instagramId,
-    );
+    const postCreate = await storeInstagramPosts(posts, getDataByUsername.id);
 
-    // return it
-    if (Object.keys(postCreate).length > 0) {
-      return {
-        data: responseData,
-      };
-    }
-  } else {
-    return {
-      error: "Please connect before getting a post.",
-    };
+    return await postCreate
+      .then((res) => {
+        if (Object.keys(res).length > 0) {
+          return { data: getDataByUsername };
+        }
+      })
+      .catch((err) => {
+        throw err;
+      });
   }
+
+  return null;
 };
 
 export default function Index() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
+  const [open, setIsOpen] = useState(false);
+
+  const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
+  const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
 
   const { accounts } = loaderData;
 
   const [selected, setSelected] = useState("");
-  const [userData, setUserData] = useState();
-
-  if (userData) {
-    console.log(userData);
-  }
+  const [userData, setUserData] = useState({});
+  const [selectedPosts, setSelectedPosts] = useState([]);
 
   const submit = useSubmit();
 
@@ -143,17 +145,52 @@ export default function Index() {
     submit({ username: selected }, { method: "POST" });
   }, [selected]);
 
+  const handleSelectChange = useCallback(
+    (id) => {
+      setSelectedPosts((prev) => {
+        const newPosts = [...prev];
+        // find if present
+        const index = prev.findIndex((item) => item.id === id);
+        // if present change state
+        if (index !== -1) {
+          newPosts[index] = {
+            ...newPosts[index],
+            checked: !newPosts[index].checked,
+          };
+          return newPosts;
+        } else {
+          return [...newPosts, { id: id, checked: true }];
+        }
+      });
+    },
+    [selectedPosts],
+  );
+
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://slovakia-vp-mr-glance.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://elvis-sharp-charming-chick.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
   };
 
+  useEffect(() => {
+    console.log(selectedPosts);
+  }, [selectedPosts]);
+
   return (
     <Page
       title="Instagram Integration"
       subtitle="Connect and manage your Instagram business accounts"
+      primaryAction={
+        <Button
+          primary
+          onClick={handleModalOpen}
+          disabled={selectedPosts.filter((item) => item.checked).length === 0}
+        >
+          View Selected Posts (
+          {selectedPosts.filter((item) => item.checked).length})
+        </Button>
+      }
     >
       <Layout>
         <Layout.Section>
@@ -178,27 +215,65 @@ export default function Index() {
               <Text variant={"headingMd"} as={"h2"}>
                 Instagram Posts
               </Text>
-              <Grid gap="400">
-                {userData?.data?.data?.map((item, index) => (
-                  <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4 }}>
-                    <MediaCard
-                      title={item.caption}
-                      primaryAction={{
-                        content: "View",
-                        url: item.permalink,
-                      }}
-                      description={item.caption}
-                      popoverActions={[{ content: "Dismiss" }]}
-                      portrait={
-                        <VideoThumbnail
-                          source={instagramVideo}
-                          poster={item.thumbnail_url}
-                          onClick={() => {
-                            window.open(item.permalink, "_blank");
-                          }}
+              <Grid>
+                {userData?.posts?.map((post) => (
+                  <Grid.Cell
+                    key={post.id}
+                    columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
+                  >
+                    <div style={{ position: "relative" }}>
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          left: "10px",
+                          zIndex: "1",
+                        }}
+                      >
+                        <Checkbox
+                          checked={selectedPosts.some(
+                            (item) =>
+                              item.id === post.id && item.checked === true,
+                          )}
+                          label={post.caption}
+                          onChange={(checked, id) => handleSelectChange(id)}
+                          id={post.id}
                         />
-                      }
-                    />
+                      </div>
+
+                      <MediaCard
+                        portrait
+                        title={post.username}
+                        description={post.caption || "No caption"}
+                        timestamp={new Date(
+                          post.timestamp,
+                        ).toLocaleDateString()}
+                      >
+                        {post.mediaType === "VIDEO" ? (
+                          <VideoThumbnail
+                            videoLength={0}
+                            thumbnailUrl={post.thumbnailUrl}
+                            onClick={() =>
+                              window.open(post.permalink, "_blank")
+                            }
+                          />
+                        ) : (
+                          <img
+                            src={post.mediaUrl || post.thumbnailUrl}
+                            alt={post.caption || "Instagram post"}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              aspectRatio: "1/1",
+                            }}
+                            onClick={() =>
+                              window.open(post.permalink, "_blank")
+                            }
+                          />
+                        )}
+                      </MediaCard>
+                    </div>
                   </Grid.Cell>
                 ))}
               </Grid>
@@ -227,6 +302,67 @@ export default function Index() {
             </BlockStack>
           </FooterHelp>
         </Layout.Section>
+        <Modal open={open} onHide={handleModalClose} variant={"large"}>
+          <Box
+            padding={"200"}
+            style={{ paddingTop: "20px", paddingBottom: "20px" }}
+          >
+            <BlockStack gap="100" style={{ maxWidth: "800px", margin: "auto" }}>
+              <Grid>
+                {userData?.posts
+                  ?.filter((post) => {
+                    return selectedPosts.some(
+                      (item) => item.id == post.id && item.checked,
+                    );
+                  })
+                  .map((post) => {
+                    return (
+                      <Grid.Cell
+                        key={post.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                        }}
+                        columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
+                      >
+                        <MediaCard
+                          portrait
+                          title={post.username}
+                          description={post.caption || "No caption"}
+                          style={{ maxWidth: "250px", margin: "auto" }}
+                        >
+                          {post.mediaType === "VIDEO" ? (
+                            <VideoThumbnail
+                              videoLength={0}
+                              thumbnailUrl={post.thumbnailUrl}
+                              onClick={() =>
+                                window.open(post.permalink, "_blank")
+                              }
+                            />
+                          ) : (
+                            <img
+                              src={post.mediaUrl || post.thumbnailUrl}
+                              alt={post.caption || "Instagram post"}
+                              style={{
+                                width: "100%",
+                                height: "auto",
+                                objectFit: "cover",
+                                aspectRatio: "10px",
+                              }}
+                              onClick={() =>
+                                window.open(post.permalink, "_blank")
+                              }
+                            />
+                          )}
+                        </MediaCard>
+                      </Grid.Cell>
+                    );
+                  })}
+              </Grid>
+            </BlockStack>
+          </Box>
+        </Modal>
       </Layout>
     </Page>
   );
