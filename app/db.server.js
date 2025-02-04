@@ -66,6 +66,14 @@ export const getAllInstagramAccounts = async () => {
   return prisma.instagramAccount.findMany();
 };
 
+export const getAllInstagramAccountsWithPosts = async () => {
+  return prisma.instagramAccount.findMany({
+    include: {
+      instagramPosts: true,
+    },
+  });
+};
+
 export const findUserByInstagramId = async (instagramId) => {
   return prisma.instagramAccount.findUnique({
     where: {
