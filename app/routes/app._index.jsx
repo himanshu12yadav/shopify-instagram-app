@@ -20,6 +20,8 @@ import { json } from "@remix-run/node";
 import { useCallback, useEffect, useState } from "react";
 import { Modal } from "@shopify/app-bridge-react";
 
+import { RefreshIcon } from "@shopify/polaris-icons";
+
 import {
   Link,
   useActionData,
@@ -32,7 +34,6 @@ import axios from "axios";
 export const loader = async ({ request }) => {
   const { getAllInstagramAccounts } = await import("../db.server.js");
   const accounts = await getAllInstagramAccounts();
-  console.log("accounts: ", accounts);
   return json({ accounts });
 };
 
@@ -82,21 +83,16 @@ export const action = async ({ request }) => {
 
   // getting formData
   const username = formData.get("username");
+  const updatePost = JSON.parse(formData.get("updatePost"));
 
-  // find by username if not empty
-
+  const getDataByUsername = await findUserByInstagramUsername(username);
+  const accessToken = getDataByUsername?.instagramToken;
   if (username) {
-    const getDataByUsername = await findUserByInstagramUsername(username);
-
-    // user existing in database and posts length is greater than 0.
     if (getDataByUsername.posts.length > 0) {
       return {
         data: getDataByUsername,
       };
     }
-
-    // getting token from getDataByUsername
-    const accessToken = getDataByUsername.instagramToken;
 
     const response = await axios.get(
       `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
@@ -108,7 +104,7 @@ export const action = async ({ request }) => {
     const postCreate = await storeInstagramPosts(posts, getDataByUsername.id);
 
     return await postCreate
-      .then((res) => {
+      ?.then((res) => {
         if (Object.keys(res).length > 0) {
           return { data: getDataByUsername };
         }
@@ -118,6 +114,20 @@ export const action = async ({ request }) => {
       });
   }
 
+  if (updatePost?.action === "UPDATE_POST") {
+    const username = updatePost?.username;
+    const getDataByUsername = await findUserByInstagramUsername(username);
+    const accessToken = getDataByUsername?.instagramToken;
+
+    const response = await axios.get(
+      `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
+    );
+
+    const posts = response.data.data;
+    await storeInstagramPosts(posts, getDataByUsername.id);
+    return { data: getDataByUsername };
+  }
+
   return null;
 };
 
@@ -125,11 +135,20 @@ export default function Index() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
   const [open, setIsOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  if (actionData) {
+    console.log(actionData);
+  }
 
   const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
   const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
 
   const { accounts } = loaderData;
+
+  if (actionData) {
+    console.log(actionData);
+  }
 
   const [selected, setSelected] = useState("");
   const [userData, setUserData] = useState({});
@@ -142,32 +161,49 @@ export default function Index() {
   }, [actionData]);
 
   useEffect(() => {
-    submit({ username: selected }, { method: "POST" });
+    submit({ username: selected, action: "GET_POST" }, { method: "POST" });
   }, [selected]);
 
-  const handleSelectChange = useCallback(
-    (id) => {
-      setSelectedPosts((prev) => {
-        const newPosts = [...prev];
-        // find if present
-        const index = prev.findIndex((item) => item.id === id);
-        // if present change state
-        if (index !== -1) {
-          newPosts[index] = {
-            ...newPosts[index],
-            checked: !newPosts[index].checked,
-          };
-          return newPosts;
-        } else {
-          return [...newPosts, { id: id, checked: true }];
-        }
-      });
-    },
-    [selectedPosts],
-  );
+  // useEffect(() => {
+  //   submit({ posts: selectedPosts }, { method: "POST" });
+  // }, [selectedPosts]);
+
+  const handleSelectChange = useCallback((id) => {
+    submit(
+      {
+        postId: id,
+        selectionStatus: !userData?.posts?.find((post) => post.id === id)
+          ?.selectedPost?.selectionStatus,
+      },
+      [submit, userData],
+    );
+  });
+
+  // useEffect(() => {}, [actionData]);
+
+  // const handleSelectChange = useCallback(
+  //   (id) => {
+  //     setSelectedPosts((prev) => {
+  //       const newPosts = [...prev];
+  //       // find if present
+  //       const index = prev.findIndex((item) => item.id === id);
+  //       // if present change state
+  //       if (index !== -1) {
+  //         newPosts[index] = {
+  //           ...newPosts[index],
+  //           checked: !newPosts[index].checked,
+  //         };
+  //         return newPosts;
+  //       } else {
+  //         return [...newPosts, { id: id, checked: true }];
+  //       }
+  //     });
+  //   },
+  //   [selectedPosts],
+  // );
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://elvis-sharp-charming-chick.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://aaron-chinese-creation-variations.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
@@ -212,9 +248,28 @@ export default function Index() {
         <Layout.Section secondary>
           <Card>
             <BlockStack gap="500" padding="500">
-              <Text variant={"headingMd"} as={"h2"}>
-                Instagram Posts
-              </Text>
+              <InlineStack align="space-between" gap="500">
+                <Text variant={"headingMd"} as={"h2"}>
+                  Instagram Posts
+                </Text>
+                <Button
+                  primary
+                  icon={RefreshIcon}
+                  onClick={() => {
+                    const postRefresh = {
+                      username: selected,
+                      action: "UPDATE_POST",
+                    };
+                    submit(
+                      { updatePost: JSON.stringify(postRefresh) },
+                      { method: "POST" },
+                    );
+                  }}
+                >
+                  Update Posts
+                </Button>
+              </InlineStack>
+
               <Grid>
                 {userData?.posts?.map((post) => (
                   <Grid.Cell

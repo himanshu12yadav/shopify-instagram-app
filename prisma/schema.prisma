@@ -41,10 +41,11 @@ model InstagramAccount {
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   posts                 InstagramPost[]
+  selectedPosts         SelectedPost[]
 }
 
 model InstagramPost {
-  id           String   @id @default(uuid()) // Ensure id has a default UUID for SQLite compatibility
+  id           String           @id @default(uuid()) 
   mediaType    String
   mediaUrl     String
   thumbnailUrl String?
@@ -52,12 +53,25 @@ model InstagramPost {
   timestamp    DateTime
   username     String
   caption      String?
-
-  accountId String
-  account   InstagramAccount @relation(fields: [accountId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  accountId    String
+  account      InstagramAccount @relation(fields: [accountId], references: [id])
+  selectedPost SelectedPost?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@index([accountId])
+}
+
+model SelectedPost {
+  id              String           @id @default(uuid())
+  post            InstagramPost    @relation(fields: [postId], references: [id])
+  postId          String           @unique
+  account         InstagramAccount @relation(fields: [accountId], references: [id])
+  accountId       String
+  selectionStatus Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([accountId])
+  @@index([selectionStatus])
 }
