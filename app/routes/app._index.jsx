@@ -15,6 +15,7 @@ import {
   InlineStack,
   Badge,
   Box,
+  Spinner,
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
 import { useCallback, useEffect, useState } from "react";
@@ -30,7 +31,9 @@ import {
 } from "@remix-run/react";
 
 import axios from "axios";
+import { getAllInstagramPostbyAccountId } from "../db.server.js";
 
+// loader function
 export const loader = async ({ request }) => {
   const { getAllInstagramAccounts } = await import("../db.server.js");
   const accounts = await getAllInstagramAccounts();
@@ -74,6 +77,7 @@ export const SelectComponent = ({ allOption = [], option }) => {
   );
 };
 
+// action function
 export const action = async ({ request }) => {
   const formData = await request.formData();
 
@@ -83,14 +87,17 @@ export const action = async ({ request }) => {
 
   // getting formData
   const username = formData.get("username");
-  const updatePost = JSON.parse(formData.get("updatePost"));
+  // const updatePost = JSON.parse(formData.get("updatePost"));
 
-  const getDataByUsername = await findUserByInstagramUsername(username);
-  const accessToken = getDataByUsername?.instagramToken;
   if (username) {
-    if (getDataByUsername.posts.length > 0) {
+    const dbUsername = await findUserByInstagramUsername(username);
+    const accessToken = dbUsername?.instagramToken;
+
+    if (dbUsername.posts.length > 0) {
+      const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
+
       return {
-        data: getDataByUsername,
+        data: posts,
       };
     }
 
@@ -101,72 +108,51 @@ export const action = async ({ request }) => {
     const posts = response.data.data;
 
     // save data in database
-    const postCreate = await storeInstagramPosts(posts, getDataByUsername.id);
-
-    return await postCreate
-      ?.then((res) => {
-        if (Object.keys(res).length > 0) {
-          return { data: getDataByUsername };
-        }
-      })
-      .catch((err) => {
-        throw err;
-      });
-  }
-
-  if (updatePost?.action === "UPDATE_POST") {
-    const username = updatePost?.username;
-    const getDataByUsername = await findUserByInstagramUsername(username);
-    const accessToken = getDataByUsername?.instagramToken;
-
-    const response = await axios.get(
-      `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
-    );
-
-    const posts = response.data.data;
-    await storeInstagramPosts(posts, getDataByUsername.id);
-    return { data: getDataByUsername };
+    const postCreate = await storeInstagramPosts(posts, dbUsername.id);
+    if (postCreate) {
+      const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
+      return { data: posts };
+    }
   }
 
   return null;
 };
 
+// component function
+
 export default function Index() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
   const [open, setIsOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  if (actionData) {
-    console.log(actionData);
-  }
+  const [selectPost, setSelectPost] = useState({ id: null, checked: false });
 
   const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
   const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
 
   const { accounts } = loaderData;
 
-  if (actionData) {
-    console.log(actionData);
-  }
+  const [selected, setSelected] = useState({});
+  const [userData, setUserData] = useState([]);
 
-  const [selected, setSelected] = useState("");
-  const [userData, setUserData] = useState({});
-  const [selectedPosts, setSelectedPosts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const submit = useSubmit();
+
+  // usedffect
 
   useEffect(() => {
     setUserData(actionData?.data);
   }, [actionData]);
 
   useEffect(() => {
-    submit({ username: selected, action: "GET_POST" }, { method: "POST" });
-  }, [selected]);
+    submit({ selectPost: JSON.stringify(selectPost) }, { method: "POST" });
+  }, [selectPost]);
 
-  // useEffect(() => {
-  //   submit({ posts: selectedPosts }, { method: "POST" });
-  // }, [selectedPosts]);
+  useEffect(() => {
+    setLoading(true);
+    submit({ username: selected }, { method: "POST" });
+    setLoading(false);
+  }, [selected, submit]);
 
   const handleSelectChange = useCallback((id) => {
     submit(
@@ -203,28 +189,19 @@ export default function Index() {
   // );
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://aaron-chinese-creation-variations.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://ago-weather-gb-country.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
   };
-
-  useEffect(() => {
-    console.log(selectedPosts);
-  }, [selectedPosts]);
 
   return (
     <Page
       title="Instagram Integration"
       subtitle="Connect and manage your Instagram business accounts"
       primaryAction={
-        <Button
-          primary
-          onClick={handleModalOpen}
-          disabled={selectedPosts.filter((item) => item.checked).length === 0}
-        >
-          View Selected Posts (
-          {selectedPosts.filter((item) => item.checked).length})
+        <Button primary onClick={handleModalOpen}>
+          View Selected Posts
         </Button>
       }
     >
@@ -269,69 +246,75 @@ export default function Index() {
                   Update Posts
                 </Button>
               </InlineStack>
+              {loading ? (
+                <Spinner accessibilityLabel="Loading posts" size="large" />
+              ) : (
+                <Grid>
+                  {userData?.map((post) => (
+                    <Grid.Cell
+                      key={post.id}
+                      columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
+                    >
+                      <div style={{ position: "relative" }}>
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "10px",
+                            left: "10px",
+                            zIndex: "1",
+                          }}
+                        >
+                          <Checkbox
+                            checked={post.selected}
+                            label={post.caption}
+                            onChange={() =>
+                              setSelectPost({
+                                id: post.id,
+                                checked: !post.selected,
+                              })
+                            }
+                            id={post.id}
+                          />
+                        </div>
 
-              <Grid>
-                {userData?.posts?.map((post) => (
-                  <Grid.Cell
-                    key={post.id}
-                    columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
-                  >
-                    <div style={{ position: "relative" }}>
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "10px",
-                          left: "10px",
-                          zIndex: "1",
-                        }}
-                      >
-                        <Checkbox
-                          checked={selectedPosts.some(
-                            (item) =>
-                              item.id === post.id && item.checked === true,
+                        <MediaCard
+                          portrait
+                          title={post.username}
+                          description={post.caption || "No caption"}
+                          timestamp={new Date(
+                            post.timestamp,
+                          ).toLocaleDateString()}
+                        >
+                          {post.mediaType === "VIDEO" ? (
+                            <VideoThumbnail
+                              videoLength={0}
+                              thumbnailUrl={post.thumbnailUrl}
+                              onClick={() =>
+                                window.open(post.permalink, "_blank")
+                              }
+                            />
+                          ) : (
+                            <img
+                              src={post.mediaUrl || post.thumbnailUrl}
+                              alt={post.caption || "Instagram post"}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                aspectRatio: "1/1",
+                              }}
+                              onClick={() =>
+                                window.open(post.permalink, "_blank")
+                              }
+                            />
                           )}
-                          label={post.caption}
-                          onChange={(checked, id) => handleSelectChange(id)}
-                          id={post.id}
-                        />
+                        </MediaCard>
                       </div>
+                    </Grid.Cell>
+                  ))}
+                </Grid>
+              )}
 
-                      <MediaCard
-                        portrait
-                        title={post.username}
-                        description={post.caption || "No caption"}
-                        timestamp={new Date(
-                          post.timestamp,
-                        ).toLocaleDateString()}
-                      >
-                        {post.mediaType === "VIDEO" ? (
-                          <VideoThumbnail
-                            videoLength={0}
-                            thumbnailUrl={post.thumbnailUrl}
-                            onClick={() =>
-                              window.open(post.permalink, "_blank")
-                            }
-                          />
-                        ) : (
-                          <img
-                            src={post.mediaUrl || post.thumbnailUrl}
-                            alt={post.caption || "Instagram post"}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                              aspectRatio: "1/1",
-                            }}
-                            onClick={() =>
-                              window.open(post.permalink, "_blank")
-                            }
-                          />
-                        )}
-                      </MediaCard>
-                    </div>
-                  </Grid.Cell>
-                ))}
-              </Grid>
               <div style={{ display: "flex", justifyContent: "center" }}>
                 <Pagination label={2} />
               </div>

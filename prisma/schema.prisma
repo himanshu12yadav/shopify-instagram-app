@@ -41,37 +41,25 @@ model InstagramAccount {
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   posts                 InstagramPost[]
-  selectedPosts         SelectedPost[]
 }
 
-model InstagramPost {
-  id           String           @id @default(uuid()) 
-  mediaType    String
-  mediaUrl     String
+model InstagramPost{
+  id                    String          @id @default(uuid())
+  mediaType   String
+  mediaUrl  String
   thumbnailUrl String?
-  permalink    String
-  timestamp    DateTime
-  username     String
-  caption      String?
-  accountId    String
-  account      InstagramAccount @relation(fields: [accountId], references: [id])
-  selectedPost SelectedPost?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  permalink String
+  timestamp DateTime
+  username String
+  caption String?
+  accountId String 
+  account InstagramAccount @relation(fields: [accountId], references: [id])
+  selected Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([accountId])
+  @@index([selected])
 }
 
-model SelectedPost {
-  id              String           @id @default(uuid())
-  post            InstagramPost    @relation(fields: [postId], references: [id])
-  postId          String           @unique
-  account         InstagramAccount @relation(fields: [accountId], references: [id])
-  accountId       String
-  selectionStatus Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
 
-  @@index([accountId])
-  @@index([selectionStatus])
-}
