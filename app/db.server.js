@@ -75,12 +75,37 @@ export const findUserByInstagramId = async (instagramId) => {
 };
 
 export const findUserByInstagramUsername = async (instagramUsername) => {
-  return prisma.instagramAccount.findUnique({
+  return prisma.instagramAccount.findFirst({
     where: {
       instagramUsername: instagramUsername,
     },
     include: {
       posts: true,
+    },
+  });
+};
+
+// all post related functions
+
+export const getPosts = async () => {
+  return prisma.instagramPost.findMany();
+};
+
+export const findPostById = async (postId) => {
+  return prisma.instagramPost.findUnique({
+    where: {
+      id: postId,
+    },
+  });
+};
+
+export const updatePostData = async (postId, fieldName, fieldValue) => {
+  return prisma.instagramPost.update({
+    where: {
+      id: String(postId),
+    },
+    data: {
+      [fieldName]: fieldValue,
     },
   });
 };

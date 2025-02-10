@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "769d7b3b0d233f22f819e8a9f853c1be"
-application_url = "https://periodic-acknowledge-johns-roughly.trycloudflare.com"
+application_url = "https://certificates-dancing-cheese-actors.trycloudflare.com"
 embedded = true
 name = "consumer-app"
 handle = "consumer-app-4"
@@ -23,9 +23,10 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://periodic-acknowledge-johns-roughly.trycloudflare.com/auth/callback",
-  "https://periodic-acknowledge-johns-roughly.trycloudflare.com/auth/shopify/callback",
-  "https://periodic-acknowledge-johns-roughly.trycloudflare.com/api/auth/callback"
+  "https://certificates-dancing-cheese-actors.trycloudflare.com/auth/callback",
+  "https://certificates-dancing-cheese-actors.trycloudflare.com/auth/shopify/callback",
+  "https://certificates-dancing-cheese-actors.trycloudflare.com/api/auth/callback",
+  "https://certificates-dancing-cheese-actors.trycloudflare.com/auth/instagram/callback",
 ]
 
 [pos]

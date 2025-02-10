@@ -31,12 +31,16 @@ import {
 } from "@remix-run/react";
 
 import axios from "axios";
-import { getAllInstagramPostbyAccountId } from "../db.server.js";
+import {
+  getAllInstagramPostbyAccountId,
+  updatePostData,
+} from "../db.server.js";
 
 // loader function
 export const loader = async ({ request }) => {
   const { getAllInstagramAccounts } = await import("../db.server.js");
   const accounts = await getAllInstagramAccounts();
+
   return json({ accounts });
 };
 
@@ -77,23 +81,136 @@ export const SelectComponent = ({ allOption = [], option }) => {
   );
 };
 
+const ModalGridComponent = ({ posts }) => {
+  return (
+    <Grid>
+      {posts
+        ?.filter((post) => post.selected)
+        .map((post) => (
+          <Grid.Cell
+            key={post.id}
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+            columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
+          >
+            <MediaCard
+              portrait
+              title={post.username}
+              description={post.caption || "No captoin"}
+              style={{
+                maxWidth: "100%",
+              }}
+            >
+              {post.mediaType === "VIDEO" ? (
+                <VideoThumbnail
+                  videoLength={0}
+                  thumbnailUrl={post.thumbnailUrl}
+                  onClick={() => window.open(post.permalink, "_blank")}
+                />
+              ) : (
+                <img
+                  src={post.mediaUrl || post.thumbnailUrl}
+                  alt={post.caption || "Instagram post"}
+                  style={{
+                    width: "100%",
+                    height: "auto",
+                    objectFit: "cover",
+                    aspectRatio: "10px",
+                  }}
+                  onClick={() => window.open(post.permalink, "_blank")}
+                />
+              )}
+            </MediaCard>
+          </Grid.Cell>
+        ))}
+    </Grid>
+  );
+};
+
 // action function
 export const action = async ({ request }) => {
   const formData = await request.formData();
 
-  const { findUserByInstagramUsername, storeInstagramPosts } = await import(
-    "../db.server.js"
+  const { findUserByInstagramUsername, storeInstagramPosts, findPostById } =
+    await import("../db.server.js");
+
+  // getting selected account
+  const selectedAccount = formData.get("selectedAccount");
+
+  // getting checked post
+  const checkedPost = JSON.parse(formData.get("checkedPost"));
+
+  // refresh the posts
+  const refreshInstagramPosts = JSON.parse(
+    formData.get("refreshInstagramPosts"),
   );
 
-  // getting formData
-  const username = formData.get("username");
-  // const updatePost = JSON.parse(formData.get("updatePost"));
+  if (refreshInstagramPosts) {
+    const { refresh, selectedAccount } = refreshInstagramPosts;
 
-  if (username) {
-    const dbUsername = await findUserByInstagramUsername(username);
+    const { instagramToken: accessToken } =
+      await findUserByInstagramUsername(selectedAccount);
+
+    if (refresh) {
+      const { data } = await axios.get(
+        `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
+      );
+      const currentPosts = data.data;
+
+      const oldPosts = await getAllInstagramPostbyAccountId(selectedAccount);
+      console.log("currentPosts", currentPosts);
+      console.log("oldPosts", oldPosts);
+      return null;
+
+      /**
+       * comparing old id with current id if present i extract it.
+       */
+
+      const tempOld = currentPosts.filter((post) => {
+        return oldPosts.some(({ id }) => id === post.id);
+      });
+
+      /**
+       * comparing old id with current id if not present i create it.
+       *
+       */
+
+      const tempNew = currentPosts.filter((post) => {
+        return oldPosts.some(({ id }) => id !== post.id);
+      });
+
+      const updatedPosts = [...tempOld, ...tempNew];
+      console.log("updatedPosts", updatedPosts.length);
+
+      return null;
+    }
+  }
+
+  if (checkedPost && Object.keys(checkedPost).length > 0) {
+    const postId = checkedPost.id;
+    const selectionStatus = checkedPost.checked;
+    const currentPost = await findPostById(postId);
+
+    if (postId && currentPost.id) {
+      const { account } = currentPost;
+      await updatePostData(currentPost.id, "selected", selectionStatus);
+      return {
+        data: await getAllInstagramPostbyAccountId(account),
+      };
+    }
+
+    return null;
+  }
+
+  if (selectedAccount) {
+    const dbUsername = await findUserByInstagramUsername(selectedAccount);
     const accessToken = dbUsername?.instagramToken;
 
     if (dbUsername.posts.length > 0) {
+      console.log("posts", dbUsername.posts);
       const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
 
       return {
@@ -105,14 +222,11 @@ export const action = async ({ request }) => {
       `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
     );
 
-    const posts = response.data.data;
+    const posts = await response.data.data;
 
     // save data in database
-    const postCreate = await storeInstagramPosts(posts, dbUsername.id);
-    if (postCreate) {
-      const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
-      return { data: posts };
-    }
+    await storeInstagramPosts(posts, dbUsername.id);
+    return { data: await getAllInstagramPostbyAccountId(dbUsername.id) };
   }
 
   return null;
@@ -124,76 +238,60 @@ export default function Index() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
   const [open, setIsOpen] = useState(false);
-  const [selectPost, setSelectPost] = useState({ id: null, checked: false });
-
-  const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
-  const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
-
-  const { accounts } = loaderData;
+  const [selectPost, setSelectPost] = useState({ id: "", checked: false });
 
   const [selected, setSelected] = useState({});
   const [userData, setUserData] = useState([]);
 
   const [loading, setLoading] = useState(false);
+  const [totalSelectedPost, setTotalSelectedPost] = useState(0);
+
+  const { accounts } = loaderData;
+
+  const instagramUrl =
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://certificates-dancing-cheese-actors.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
-  // usedffect
-
-  useEffect(() => {
-    setUserData(actionData?.data);
-  }, [actionData]);
-
-  useEffect(() => {
-    submit({ selectPost: JSON.stringify(selectPost) }, { method: "POST" });
-  }, [selectPost]);
+  // useEffect start here
 
   useEffect(() => {
     setLoading(true);
-    submit({ username: selected }, { method: "POST" });
+    setUserData(actionData?.data);
     setLoading(false);
+  }, [actionData]);
+
+  useEffect(() => {
+    submit({ selectedAccount: selected }, { method: "POST" });
   }, [selected, submit]);
 
-  const handleSelectChange = useCallback((id) => {
-    submit(
-      {
-        postId: id,
-        selectionStatus: !userData?.posts?.find((post) => post.id === id)
-          ?.selectedPost?.selectionStatus,
-      },
-      [submit, userData],
-    );
-  });
+  useEffect(() => {
+    submit({ checkedPost: JSON.stringify(selectPost) }, { method: "POST" });
+  }, [selectPost]);
 
-  // useEffect(() => {}, [actionData]);
+  useEffect(() => {
+    let count = 0;
 
-  // const handleSelectChange = useCallback(
-  //   (id) => {
-  //     setSelectedPosts((prev) => {
-  //       const newPosts = [...prev];
-  //       // find if present
-  //       const index = prev.findIndex((item) => item.id === id);
-  //       // if present change state
-  //       if (index !== -1) {
-  //         newPosts[index] = {
-  //           ...newPosts[index],
-  //           checked: !newPosts[index].checked,
-  //         };
-  //         return newPosts;
-  //       } else {
-  //         return [...newPosts, { id: id, checked: true }];
-  //       }
-  //     });
-  //   },
-  //   [selectedPosts],
-  // );
+    if (userData && userData) {
+      const totalCount = userData.filter((item) => item.selected).length;
+      count = totalCount;
+    }
 
-  const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://ago-weather-gb-country.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    setTotalSelectedPost(count);
+  }, [userData]);
+
+  // end here
+
+  if (userData) {
+    console.log("userData", userData);
+  }
 
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
   };
+
+  const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
+  const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
 
   return (
     <Page
@@ -201,7 +299,7 @@ export default function Index() {
       subtitle="Connect and manage your Instagram business accounts"
       primaryAction={
         <Button primary onClick={handleModalOpen}>
-          View Selected Posts
+          View Selected Posts <Badge>{totalSelectedPost}</Badge>
         </Button>
       }
     >
@@ -233,12 +331,13 @@ export default function Index() {
                   primary
                   icon={RefreshIcon}
                   onClick={() => {
-                    const postRefresh = {
-                      username: selected,
-                      action: "UPDATE_POST",
+                    const payload = {
+                      refresh: true,
+                      selectedAccount: selected,
                     };
                     submit(
-                      { updatePost: JSON.stringify(postRefresh) },
+                      { refreshInstagramPosts: JSON.stringify(payload) },
+
                       { method: "POST" },
                     );
                   }}
@@ -246,75 +345,71 @@ export default function Index() {
                   Update Posts
                 </Button>
               </InlineStack>
-              {loading ? (
-                <Spinner accessibilityLabel="Loading posts" size="large" />
-              ) : (
-                <Grid>
-                  {userData?.map((post) => (
-                    <Grid.Cell
-                      key={post.id}
-                      columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
-                    >
-                      <div style={{ position: "relative" }}>
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "10px",
-                            left: "10px",
-                            zIndex: "1",
-                          }}
-                        >
-                          <Checkbox
-                            checked={post.selected}
-                            label={post.caption}
-                            onChange={() =>
-                              setSelectPost({
-                                id: post.id,
-                                checked: !post.selected,
-                              })
-                            }
-                            id={post.id}
-                          />
-                        </div>
 
-                        <MediaCard
-                          portrait
-                          title={post.username}
-                          description={post.caption || "No caption"}
-                          timestamp={new Date(
-                            post.timestamp,
-                          ).toLocaleDateString()}
-                        >
-                          {post.mediaType === "VIDEO" ? (
-                            <VideoThumbnail
-                              videoLength={0}
-                              thumbnailUrl={post.thumbnailUrl}
-                              onClick={() =>
-                                window.open(post.permalink, "_blank")
-                              }
-                            />
-                          ) : (
-                            <img
-                              src={post.mediaUrl || post.thumbnailUrl}
-                              alt={post.caption || "Instagram post"}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                aspectRatio: "1/1",
-                              }}
-                              onClick={() =>
-                                window.open(post.permalink, "_blank")
-                              }
-                            />
-                          )}
-                        </MediaCard>
+              <Grid>
+                {userData?.map((post) => (
+                  <Grid.Cell
+                    key={post.id}
+                    columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
+                  >
+                    <div style={{ position: "relative" }}>
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          left: "10px",
+                          zIndex: "1",
+                        }}
+                      >
+                        <Checkbox
+                          checked={post.selected}
+                          label={post.caption}
+                          onChange={() =>
+                            setSelectPost({
+                              id: post.id,
+                              checked: !post.selected,
+                            })
+                          }
+                          id={post.id}
+                        />
                       </div>
-                    </Grid.Cell>
-                  ))}
-                </Grid>
-              )}
 
+                      <MediaCard
+                        portrait
+                        title={post.username}
+                        description={post.caption || "No caption"}
+                        timestamp={new Date(
+                          post.timestamp,
+                        ).toLocaleDateString()}
+                      >
+                        {post.mediaType === "VIDEO" ? (
+                          <VideoThumbnail
+                            videoLength={0}
+                            thumbnailUrl={post.thumbnailUrl}
+                            onClick={() =>
+                              window.open(post.permalink, "_blank")
+                            }
+                          />
+                        ) : (
+                          <img
+                            src={post.mediaUrl || post.thumbnailUrl}
+                            alt={post.caption || "Instagram post"}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              aspectRatio: "1/1",
+                            }}
+                            onClick={() =>
+                              window.open(post.permalink, "_blank")
+                            }
+                          />
+                        )}
+                      </MediaCard>
+                    </div>
+                  </Grid.Cell>
+                ))}
+              </Grid>
               <div style={{ display: "flex", justifyContent: "center" }}>
                 <Pagination label={2} />
               </div>
@@ -346,58 +441,7 @@ export default function Index() {
             style={{ paddingTop: "20px", paddingBottom: "20px" }}
           >
             <BlockStack gap="100" style={{ maxWidth: "800px", margin: "auto" }}>
-              <Grid>
-                {userData?.posts
-                  ?.filter((post) => {
-                    return selectedPosts.some(
-                      (item) => item.id == post.id && item.checked,
-                    );
-                  })
-                  .map((post) => {
-                    return (
-                      <Grid.Cell
-                        key={post.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "center",
-                          alignItems: "center",
-                        }}
-                        columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
-                      >
-                        <MediaCard
-                          portrait
-                          title={post.username}
-                          description={post.caption || "No caption"}
-                          style={{ maxWidth: "250px", margin: "auto" }}
-                        >
-                          {post.mediaType === "VIDEO" ? (
-                            <VideoThumbnail
-                              videoLength={0}
-                              thumbnailUrl={post.thumbnailUrl}
-                              onClick={() =>
-                                window.open(post.permalink, "_blank")
-                              }
-                            />
-                          ) : (
-                            <img
-                              src={post.mediaUrl || post.thumbnailUrl}
-                              alt={post.caption || "Instagram post"}
-                              style={{
-                                width: "100%",
-                                height: "auto",
-                                objectFit: "cover",
-                                aspectRatio: "10px",
-                              }}
-                              onClick={() =>
-                                window.open(post.permalink, "_blank")
-                              }
-                            />
-                          )}
-                        </MediaCard>
-                      </Grid.Cell>
-                    );
-                  })}
-              </Grid>
+              <ModalGridComponent posts={userData} />
             </BlockStack>
           </Box>
         </Modal>
