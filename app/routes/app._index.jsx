@@ -134,8 +134,12 @@ const ModalGridComponent = ({ posts }) => {
 export const action = async ({ request }) => {
   const formData = await request.formData();
 
-  const { findUserByInstagramUsername, storeInstagramPosts, findPostById } =
-    await import("../db.server.js");
+  const {
+    findUserByInstagramUsername,
+    storeInstagramPosts,
+    findPostById,
+    deleteAllPostByAccountId,
+  } = await import("../db.server.js");
 
   // getting selected account
   const selectedAccount = formData.get("selectedAccount");
@@ -151,41 +155,22 @@ export const action = async ({ request }) => {
   if (refreshInstagramPosts) {
     const { refresh, selectedAccount } = refreshInstagramPosts;
 
-    const { instagramToken: accessToken } =
+    const { instagramToken: accessToken, id } =
       await findUserByInstagramUsername(selectedAccount);
 
     if (refresh) {
+      await deleteAllPostByAccountId(id);
+
       const { data } = await axios.get(
         `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
       );
       const currentPosts = data.data;
 
-      const oldPosts = await getAllInstagramPostbyAccountId(selectedAccount);
-      console.log("currentPosts", currentPosts);
-      console.log("oldPosts", oldPosts);
-      return null;
+      await storeInstagramPosts(currentPosts, id);
 
-      /**
-       * comparing old id with current id if present i extract it.
-       */
-
-      const tempOld = currentPosts.filter((post) => {
-        return oldPosts.some(({ id }) => id === post.id);
-      });
-
-      /**
-       * comparing old id with current id if not present i create it.
-       *
-       */
-
-      const tempNew = currentPosts.filter((post) => {
-        return oldPosts.some(({ id }) => id !== post.id);
-      });
-
-      const updatedPosts = [...tempOld, ...tempNew];
-      console.log("updatedPosts", updatedPosts.length);
-
-      return null;
+      return {
+        data: await getAllInstagramPostbyAccountId(id),
+      };
     }
   }
 
@@ -249,7 +234,7 @@ export default function Index() {
   const { accounts } = loaderData;
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://certificates-dancing-cheese-actors.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://notre-italia-browsers-switzerland.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 

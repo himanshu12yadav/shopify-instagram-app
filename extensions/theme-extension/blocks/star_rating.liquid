@@ -1,0 +1,55 @@
+
+<style>
+  .instagram-feed {
+    margin-top: 20px;
+  }
+  
+  .instagram-post {
+    margin: 10px 0;
+    padding: 10px;
+    border: 1px solid #eee;
+  }
+  
+  .instagram-post img {
+    max-width: 100%;
+    height: auto;
+  }
+</style>
+
+<div class="instagram-feed" data-instagram-id="{{ block.settings.product.id }}">
+  <h1>Instagram Posts</h1>
+  <div id="instagram-posts">
+
+  </div>
+</div>
+<script defer>
+  const shop = {{ shop.permanent_domain | json }};
+
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    
+    try{
+    console.log('hello');
+      const response = await fetch(`https://notre-italia-browsers-switzerland.trycloudflare.com/api/fetchPosts`)
+      const data = await response.json();
+      console.log(data);  
+
+    }catch(err){
+      throw err;
+    }
+  })
+  
+
+
+</script>
+
+
+{% schema %}
+{
+  "name": "Star Rating",
+  "target": "section",
+  "settings": [
+    { "type": "product", "id": "product", "label": "product", "autofill": true },
+    { "type": "color", "id": "colour", "label": "Star Colour", "default": "#ff0000" }
+  ]
+}
+{% endschema %}

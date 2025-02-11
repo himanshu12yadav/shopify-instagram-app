@@ -91,6 +91,30 @@ export const getPosts = async () => {
   return prisma.instagramPost.findMany();
 };
 
+export const deleteAllPostByAccountId = async (accountId) => {
+  return prisma.instagramPost.deleteMany({
+    where: {
+      accountId: accountId,
+    },
+  });
+};
+
+export const getAllInstagramPostbyCondition = async (condition) => {
+  try {
+    const posts = await prisma.instagramPost.findMany({
+      include: {
+        account: true,
+      },
+      where: { ...condition },
+    });
+
+    return posts;
+  } catch (error) {
+    console.error("Error fetching Instagram posts:", error);
+    return { error: "Failed to fetch posts", details: error };
+  }
+};
+
 export const findPostById = async (postId) => {
   return prisma.instagramPost.findUnique({
     where: {
