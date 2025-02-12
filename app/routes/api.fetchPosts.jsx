@@ -22,7 +22,7 @@ export const loader = async ({ request }) => {
       status: 200,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "max-age=300",
+        "Cache-Control": "no-cache",
         "Content-Type": "application/json",
       },
     },

@@ -18,7 +18,7 @@ export const loader = async ({ request }) => {
       client_secret: "33f126ed6da9cf78907abb35ca28c22e",
       grant_type: "authorization_code",
       redirect_uri:
-        "https://notre-italia-browsers-switzerland.trycloudflare.com/auth/instagram/callback",
+        "https://generating-celebrities-power-hand.trycloudflare.com/auth/instagram/callback",
       code,
     });
 

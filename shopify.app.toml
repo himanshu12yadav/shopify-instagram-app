@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "769d7b3b0d233f22f819e8a9f853c1be"
-application_url = "https://weed-moment-investigations-tutorial.trycloudflare.com"
+application_url = "https://generating-celebrities-power-hand.trycloudflare.com"
 embedded = true
 name = "consumer-app"
 handle = "consumer-app-4"
@@ -23,9 +23,11 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://weed-moment-investigations-tutorial.trycloudflare.com/auth/callback",
-  "https://weed-moment-investigations-tutorial.trycloudflare.com/auth/shopify/callback",
-  "https://weed-moment-investigations-tutorial.trycloudflare.com/api/auth/callback"
+  "https://generating-celebrities-power-hand.trycloudflare.com/auth/callback",
+  "https://generating-celebrities-power-hand.trycloudflare.com/auth/shopify/callback",
+  "https://generating-celebrities-power-hand.trycloudflare.com/api/auth/callback",
+  "https://generating-celebrities-power-hand.trycloudflare.com/auth/instagram/callback",
+  "https://generating-celebrities-power-hand.trycloudflare.com/api/fetchPosts"
 ]
 
 [pos]
