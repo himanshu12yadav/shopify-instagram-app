@@ -15,13 +15,15 @@ import {
   InlineStack,
   Badge,
   Box,
-  Spinner,
+  TextField,
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "@shopify/app-bridge-react";
 
 import { RefreshIcon } from "@shopify/polaris-icons";
+
+import { Autocomplete, Icon } from "@shopify/polaris";
 
 import {
   Link,
@@ -166,6 +168,8 @@ export const action = async ({ request }) => {
       );
       const currentPosts = data.data;
 
+      console.log("Current Posts: ", data);
+
       await storeInstagramPosts(currentPosts, id);
 
       return {
@@ -219,11 +223,63 @@ export const action = async ({ request }) => {
 
 // component function
 
+function autocompleteExample() {
+  const deselecteOptions = useMemo(
+    () => [
+      { value: "rustic", label: "Rustic" },
+      { value: "antique", label: "Antique" },
+      { value: "vinyl", label: "Vinyl" },
+      { value: "vintage", label: "Vintage" },
+      { value: "refurbished", label: "Refurbished" },
+    ],
+    [],
+  );
+
+  const [selectedOptions, setSelectedOptions] = useState([]);
+  const [inputValue, setInputValue] = useState("");
+  const [options, setOptions] = useState(deselecteOptions);
+  const [loading, setLoading] = useState(false);
+
+  const updateText = useCallback(
+    (value) => {
+      setInputValue(value);
+
+      if (!loading) {
+        setLoading(true);
+      }
+
+      setTimeout(() => {
+        if (value === "") {
+          setOptions(deselecteOptions);
+          setLoading(false);
+          return;
+        }
+
+        const filtereedOptions = deselecteOptions.filter((option) =>
+          option.label.toLowerCase().includes(value.toLowerCase()),
+        );
+        setOptions(filtereedOptions);
+        setLoading(false);
+      }, 300);
+    },
+    [deselecteOptions, loading],
+  );
+
+  const updateSelection = useCallback((selected) => {
+    const selectedText = selected.map((selectedItem) => {
+      const matchedOption = options.find(option =>  option.value.match(selectedItem));
+    })
+    return matchedOption && matchedOption.label;
+  })
+}
+
 export default function Index() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
   const [open, setIsOpen] = useState(false);
   const [selectPost, setSelectPost] = useState({ id: "", checked: false });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("all");
 
   const [selected, setSelected] = useState({});
   const [userData, setUserData] = useState([]);
@@ -231,10 +287,16 @@ export default function Index() {
   const [loading, setLoading] = useState(false);
   const [totalSelectedPost, setTotalSelectedPost] = useState(0);
 
+  const options = [
+    { label: "All", value: "all" },
+    { label: "Photos", value: "IMAGE" },
+    { label: "Videos", value: "VIDEO" },
+  ];
+
   const { accounts } = loaderData;
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://international-versus-knight-terrace.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://earn-powell-benchmark-uk.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
@@ -265,6 +327,9 @@ export default function Index() {
     setTotalSelectedPost(count);
   }, [userData]);
 
+  useEffect(() => {
+    submit();
+  }, [searchTerm]);
   // end here
 
   if (userData) {
@@ -312,6 +377,22 @@ export default function Index() {
                 <Text variant={"headingMd"} as={"h2"}>
                   Instagram Posts
                 </Text>
+                <InlineStack gap="200" blockAlign="center">
+                  <Box minWidth="500px">
+                    <TextField
+                      label="Search posts"
+                      value={searchTerm}
+                      labelHidden
+                      placeholder="Search by caption or username"
+                      clearButton
+                      onClearButtonClick={(e) => setSearchTerm("")}
+                      onChange={(value) => setSearchTerm(value)}
+                      autoComplete="on"
+                    />
+                  </Box>
+                  <Select label="Media Type" labelHidden options={options} />
+                </InlineStack>
+
                 <Button
                   primary
                   icon={RefreshIcon}

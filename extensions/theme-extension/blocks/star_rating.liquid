@@ -1,63 +1,77 @@
-
 <style>
-
   .instagram-feed {
-  width: 100%;
-  padding: 20px;
-}
+    width: 90%;
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 10px; /* Reduced padding */
+    background-color: #fff; /* White background */
+    border-radius: 8px; /* Rounded corners */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  }
 
-.image-grid {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  gap: 20px;
-  overflow-x: auto;
-  padding: 10px;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
-.instagram-post {
-  width: 150px;
-  height: 150px;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-}
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-gap: 10px; /* Reduced gap */
+  }
 
-.media-container { height: 100%; }
-.media-container img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+  .instagram-post {
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    transition: transform 0.2s ease;
+  }
 
-.post-details {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 8px;
-  color: white;
-  transform: translateY(100%);
-  transition: transform 0.3s ease;
-}
+  .instagram-post:hover {
+    transform: scale(1.02);
+  }
 
-.instagram-post:hover .post-details {
-  transform: translateY(0);
-}
+  .media-container {
+    width: 100%;
+    overflow: hidden;
+  }
 
-.username {
-  color: white;
-  text-decoration: none;
-  font-weight: bold;
-}
+  .media-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover; /* Or contain */
+  }
 
-.caption {
-  font-size: 12px;
-  margin: 4px 0 0;
-}
+  .post-details {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent); /* Gradient overlay */
+    padding: 10px;
+    color: white;
+    opacity: 0; /* Hidden by default */
+    transform: translateY(20px); /* Slide up on hover */
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .instagram-post:hover .post-details {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .username {
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+
+  .caption {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Reduced to 2 lines */
+    -webkit-box-orient: vertical;
+  }
+
 </style>
+
 
 <div class="instagram-feed">
   <div class="image-grid">
@@ -94,14 +108,14 @@
     </div>
     <div class="post-details">
       <a href="${post.permalink}" target="_blank" class="username">@${post.username}</a>
-      <p class="caption">${post.caption}</p>
+      <p class="caption">${post.caption !== null ? post.caption : 'No caption'}</p>
     </div>
   </div>`;
   }
 
   async function fetchAllPost(){
       try{
-      const response = await fetch(`https://international-versus-knight-terrace.trycloudflare.com/api/fetchPosts`)
+      const response = await fetch(`https://earn-powell-benchmark-uk.trycloudflare.com/api/fetchPosts`)
       const data = await response.json();
       return data;  
 

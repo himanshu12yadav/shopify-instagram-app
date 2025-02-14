@@ -1,21 +1,21 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
+application_url = "https://earn-powell-benchmark-uk.trycloudflare.com"
 client_id = "769d7b3b0d233f22f819e8a9f853c1be"
-application_url = "https://international-versus-knight-terrace.trycloudflare.com"
 embedded = true
-name = "consumer-app"
 handle = "consumer-app-4"
+name = "consumer-app"
 
 [webhooks]
 api_version = "2025-01"
 
-  [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
 
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -23,18 +23,17 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://international-versus-knight-terrace.trycloudflare.com/auth/callback",
-  "https://international-versus-knight-terrace.trycloudflare.com/auth/shopify/callback",
-  "https://international-versus-knight-terrace.trycloudflare.com/api/auth/callback",
-  "https://international-versus-knight-terrace.trycloudflare.com/auth/instagram/callback",
-  "https://international-versus-knight-terrace.trycloudflare.com/api/fetchPosts",
-  
+  "https://earn-powell-benchmark-uk.trycloudflare.com/auth/callback",
+  "https://earn-powell-benchmark-uk.trycloudflare.com/auth/shopify/callback",
+  "https://earn-powell-benchmark-uk.trycloudflare.com/api/auth/callback",
+  "https://earn-powell-benchmark-uk.trycloudflare.com/auth/instagram/callback",
+  "https://earn-powell-benchmark-uk.trycloudflare.com/api/fetchPosts",
 ]
 
 [pos]
 embedded = false
 
 [build]
-dev_store_url = "quickstart-7fb02b5e.myshopify.com"
 automatically_update_urls_on_dev = true
+dev_store_url = "quickstart-7fb02b5e.myshopify.com"
 include_config_on_deploy = true
