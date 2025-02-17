@@ -69,39 +69,30 @@
     -webkit-line-clamp: 2; /* Reduced to 2 lines */
     -webkit-box-orient: vertical;
   }
-
 </style>
 
-
 <div class="instagram-feed">
-  <div class="image-grid">
-    
-  </div>
-  </div>
+  <div class="image-grid"></div>
+</div>
 <script defer>
-
-  document.addEventListener('DOMContentLoaded', async ()=>{
-
+  document.addEventListener('DOMContentLoaded', async () => {
     const container = document.querySelector('.instagram-feed');
     const postContainer = document.getElementById('instagram-posts');
     const header = container.querySelector('.header');
     const Grid = document.querySelector('.image-grid');
 
-  
-
     const responseData = await fetchAllPost();
-    const {test} = responseData;
+    const { test } = responseData;
     displayContent(test, Grid);
-  })
+  });
 
-
-  function displayContent(posts, Grid){
-    posts.forEach(post => {
-      Grid.insertAdjacentHTML("beforeend", postStructure(post));
-    })
+  function displayContent(posts, Grid) {
+    posts.forEach((post) => {
+      Grid.insertAdjacentHTML('beforeend', postStructure(post));
+    });
   }
 
-  function postStructure(post){
+  function postStructure(post) {
     return `<div class="instagram-post image-circle" id=${post.id}>
     <div class="media-container">
       <img src="${post.thumbnailUrl}"/>
@@ -113,20 +104,16 @@
   </div>`;
   }
 
-  async function fetchAllPost(){
-      try{
-      const response = await fetch(`https://earn-powell-benchmark-uk.trycloudflare.com/api/fetchPosts`)
+  async function fetchAllPost() {
+    try {
+      const response = await fetch(`https://mobiles-disco-c-patent.trycloudflare.com/api/fetchPosts`);
       const data = await response.json();
-      return data;  
-
-    }catch(err){
+      return data;
+    } catch (err) {
       throw err;
     }
   }
-  
-
 </script>
-
 
 {% schema %}
 {

@@ -16,6 +16,9 @@ import {
   Badge,
   Box,
   TextField,
+  SkeletonThumbnail,
+  SkeletonBodyText,
+  SkeletonDisplayText,
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -23,6 +26,7 @@ import { Modal } from "@shopify/app-bridge-react";
 
 import { RefreshIcon } from "@shopify/polaris-icons";
 
+import { SearchIcon } from "@shopify/polaris-icons";
 import { Autocomplete, Icon } from "@shopify/polaris";
 
 import {
@@ -223,55 +227,111 @@ export const action = async ({ request }) => {
 
 // component function
 
-function autocompleteExample() {
-  const deselecteOptions = useMemo(
+function AutocompleteExample() {
+  const deselectedOptions = useMemo(
     () => [
-      { value: "rustic", label: "Rustic" },
-      { value: "antique", label: "Antique" },
-      { value: "vinyl", label: "Vinyl" },
-      { value: "vintage", label: "Vintage" },
-      { value: "refurbished", label: "Refurbished" },
+      { label: "All", value: "all" },
+      { label: "Photos", value: "IMAGE" },
+      { label: "Videos", value: "VIDEO" },
     ],
     [],
   );
 
-  const [selectedOptions, setSelectedOptions] = useState([]);
+  const [selectedOptions, setSelectedOptions] = useState("");
   const [inputValue, setInputValue] = useState("");
-  const [options, setOptions] = useState(deselecteOptions);
-  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState(deselectedOptions);
+  const [isLoading, setIsLoading] = useState(false);
 
   const updateText = useCallback(
     (value) => {
+      setIsLoading(true);
       setInputValue(value);
 
-      if (!loading) {
-        setLoading(true);
+      if (value === "") {
+        setOptions(deselectedOptions);
       }
 
-      setTimeout(() => {
-        if (value === "") {
-          setOptions(deselecteOptions);
-          setLoading(false);
-          return;
-        }
+      const filterRegx = new RegExp(value, "i");
+      const resultOptions = deselectedOptions.filter((option) =>
+        option.label.match(filterRegx),
+      );
 
-        const filtereedOptions = deselecteOptions.filter((option) =>
-          option.label.toLowerCase().includes(value.toLowerCase()),
-        );
-        setOptions(filtereedOptions);
-        setLoading(false);
-      }, 300);
+      setOptions(resultOptions);
+      setIsLoading(false);
     },
-    [deselecteOptions, loading],
+    [deselectedOptions],
   );
 
-  const updateSelection = useCallback((selected) => {
-    const selectedText = selected.map((selectedItem) => {
-      const matchedOption = options.find(option =>  option.value.match(selectedItem));
-    })
-    return matchedOption && matchedOption.label;
-  })
+  const handleSelected = useCallback(
+    (selected) => {
+      const selectedValue = selected.map((selectedItem) => {
+        const matchedOption = options.find((option) =>
+          option.value.match(selectedItem),
+        );
+
+        return matchedOption && matchedOption.label;
+      });
+
+      setSelectedOptions(selectedValue);
+      setInputValue(selectedValue[0] || "");
+    },
+    [options],
+  );
+
+  const textField = (
+    <Autocomplete.TextField
+      onChange={updateText}
+      value={inputValue}
+      prefix={<Icon source={SearchIcon} tone="base" />}
+      placeholder="Search"
+      autocomplete="off"
+    />
+  );
+
+  return (
+    <div style={{ width: "100%" }}>
+      <Autocomplete
+        options={options}
+        selected={selectedOptions}
+        textField={textField}
+        onSelect={handleSelected}
+        loading={isLoading}
+      />
+    </div>
+  );
 }
+
+const SkeletonCard = () => {
+  return (
+    <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}>
+      <div style={{ position: "relative" }}>
+        <BlockStack gap="500">
+          <Box
+            background="bg-subdued"
+            borderRadius="100"
+            width="20px"
+            height="20px"
+            style={{
+              animation:
+                "polaris-SkeletonShimmerAnimation 2.5s linear infinite",
+            }}
+          />
+          <div style={{ width: "100%" }}>
+            <SkeletonThumbnail
+              style={{
+                height: "400px !important",
+                objectFit: "cover",
+                aspectRatio: "1/1",
+              }}
+            />
+          </div>
+
+          <SkeletonBodyText lines={2} />
+        </BlockStack>
+      </div>
+    </Grid.Cell>
+  );
+};
 
 export default function Index() {
   const loaderData = useLoaderData();
@@ -284,7 +344,7 @@ export default function Index() {
   const [selected, setSelected] = useState({});
   const [userData, setUserData] = useState([]);
 
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [totalSelectedPost, setTotalSelectedPost] = useState(0);
 
   const options = [
@@ -296,19 +356,22 @@ export default function Index() {
   const { accounts } = loaderData;
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://earn-powell-benchmark-uk.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://mobiles-disco-c-patent.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
   // useEffect start here
 
   useEffect(() => {
-    setLoading(true);
     setUserData(actionData?.data);
-    setLoading(false);
   }, [actionData]);
 
   useEffect(() => {
+    setIsLoading(false);
+  }, [userData]);
+
+  useEffect(() => {
+    setIsLoading(true);
     submit({ selectedAccount: selected }, { method: "POST" });
   }, [selected, submit]);
 
@@ -377,7 +440,7 @@ export default function Index() {
                 <Text variant={"headingMd"} as={"h2"}>
                   Instagram Posts
                 </Text>
-                <InlineStack gap="200" blockAlign="center">
+                {/* <InlineStack gap="200" blockAlign="center">
                   <Box minWidth="500px">
                     <TextField
                       label="Search posts"
@@ -391,7 +454,7 @@ export default function Index() {
                     />
                   </Box>
                   <Select label="Media Type" labelHidden options={options} />
-                </InlineStack>
+                </InlineStack> */}
 
                 <Button
                   primary
@@ -411,70 +474,74 @@ export default function Index() {
                   Update Posts
                 </Button>
               </InlineStack>
-
+              <AutocompleteExample />
               <Grid>
-                {userData?.map((post) => (
-                  <Grid.Cell
-                    key={post.id}
-                    columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
-                  >
-                    <div style={{ position: "relative" }}>
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "10px",
-                          left: "10px",
-                          zIndex: "1",
-                        }}
-                      >
-                        <Checkbox
-                          checked={post.selected}
-                          label={post.caption}
-                          onChange={() =>
-                            setSelectPost({
-                              id: post.id,
-                              checked: !post.selected,
-                            })
-                          }
-                          id={post.id}
-                        />
-                      </div>
+                {isLoading &&
+                  [...Array(10)].map((_, i) => <SkeletonCard key={i} />)}
 
-                      <MediaCard
-                        portrait
-                        title={post.username}
-                        description={post.caption || "No caption"}
-                        timestamp={new Date(
-                          post.timestamp,
-                        ).toLocaleDateString()}
-                      >
-                        {post.mediaType === "VIDEO" ? (
-                          <VideoThumbnail
-                            videoLength={0}
-                            thumbnailUrl={post.thumbnailUrl}
-                            onClick={() =>
-                              window.open(post.permalink, "_blank")
+                {!isLoading &&
+                  userData?.map((post) => (
+                    <Grid.Cell
+                      key={post.id}
+                      columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
+                    >
+                      <div style={{ position: "relative" }}>
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "10px",
+                            left: "10px",
+                            zIndex: "1",
+                          }}
+                        >
+                          <Checkbox
+                            checked={post.selected}
+                            label={post.caption}
+                            onChange={() =>
+                              setSelectPost({
+                                id: post.id,
+                                checked: !post.selected,
+                              })
                             }
+                            id={post.id}
                           />
-                        ) : (
-                          <img
-                            src={post.mediaUrl || post.thumbnailUrl}
-                            alt={post.caption || "Instagram post"}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                              aspectRatio: "1/1",
-                            }}
-                            onClick={() =>
-                              window.open(post.permalink, "_blank")
-                            }
-                          />
-                        )}
-                      </MediaCard>
-                    </div>
-                  </Grid.Cell>
-                ))}
+                        </div>
+
+                        <MediaCard
+                          portrait
+                          title={post.username}
+                          description={post.caption || "No caption"}
+                          timestamp={new Date(
+                            post.timestamp,
+                          ).toLocaleDateString()}
+                        >
+                          {post.mediaType === "VIDEO" ? (
+                            <VideoThumbnail
+                              videoLength={0}
+                              thumbnailUrl={post.thumbnailUrl}
+                              onClick={() =>
+                                window.open(post.permalink, "_blank")
+                              }
+                            />
+                          ) : (
+                            <img
+                              src={post.mediaUrl || post.thumbnailUrl}
+                              alt={post.caption || "Instagram post"}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                aspectRatio: "1/1",
+                              }}
+                              onClick={() =>
+                                window.open(post.permalink, "_blank")
+                              }
+                            />
+                          )}
+                        </MediaCard>
+                      </div>
+                    </Grid.Cell>
+                  ))}
               </Grid>
               <div style={{ display: "flex", justifyContent: "center" }}>
                 <Pagination label={2} />
