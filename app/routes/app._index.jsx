@@ -227,25 +227,23 @@ export const action = async ({ request }) => {
 
 // component function
 
-function AutocompleteExample() {
-  const deselectedOptions = useMemo(
-    () => [
-      { label: "All", value: "all" },
-      { label: "Photos", value: "IMAGE" },
-      { label: "Videos", value: "VIDEO" },
-    ],
-    [],
-  );
+function AutocompleteExample({
+  captionList,
+  filterOptions,
+  setInputValue: setSearchTerm,
+}) {
+  const deselectedOptions = useMemo(() => [...captionList], [captionList]);
 
   const [selectedOptions, setSelectedOptions] = useState("");
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setLocalInputValue] = useState("");
   const [options, setOptions] = useState(deselectedOptions);
   const [isLoading, setIsLoading] = useState(false);
+  const [filterOption, setFilterOption] = useState("");
 
   const updateText = useCallback(
     (value) => {
       setIsLoading(true);
-      setInputValue(value);
+      setLocalInputValue(value);
 
       if (value === "") {
         setOptions(deselectedOptions);
@@ -259,7 +257,7 @@ function AutocompleteExample() {
       setOptions(resultOptions);
       setIsLoading(false);
     },
-    [deselectedOptions],
+    [deselectedOptions, setSearchTerm],
   );
 
   const handleSelected = useCallback(
@@ -271,9 +269,9 @@ function AutocompleteExample() {
 
         return matchedOption && matchedOption.label;
       });
-
+      setSearchTerm(selectedValue);
       setSelectedOptions(selectedValue);
-      setInputValue(selectedValue[0] || "");
+      setLocalInputValue(selectedValue[0] || "");
     },
     [options],
   );
@@ -289,15 +287,31 @@ function AutocompleteExample() {
   );
 
   return (
-    <div style={{ width: "100%" }}>
-      <Autocomplete
-        options={options}
-        selected={selectedOptions}
-        textField={textField}
-        onSelect={handleSelected}
-        loading={isLoading}
-      />
-    </div>
+    <Box gap="400">
+      <InlineStack wrap={false} gap="100" align="start" blockAlign="center">
+        <div style={{ width: "100%" }}>
+          <Autocomplete
+            options={options}
+            selected={selectedOptions}
+            textField={textField}
+            onSelect={handleSelected}
+            loading={isLoading}
+          />
+        </div>
+        <div style={{ width: "100px" }}>
+          <Select
+            label="Filter by type"
+            labelHidden
+            value={filterOption}
+            options={filterOptions}
+            onChange={(value) => {
+              setFilterOption(value);
+            }}
+            tone="magic"
+          />
+        </div>
+      </InlineStack>
+    </Box>
   );
 }
 
@@ -338,8 +352,6 @@ export default function Index() {
   const actionData = useActionData();
   const [open, setIsOpen] = useState(false);
   const [selectPost, setSelectPost] = useState({ id: "", checked: false });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState("all");
 
   const [selected, setSelected] = useState({});
   const [userData, setUserData] = useState([]);
@@ -347,16 +359,21 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(false);
   const [totalSelectedPost, setTotalSelectedPost] = useState(0);
 
+  // search filter states
+  const [captionList, setCaptionList] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("all");
+
   const options = [
     { label: "All", value: "all" },
-    { label: "Photos", value: "IMAGE" },
-    { label: "Videos", value: "VIDEO" },
+    { label: "Image", value: "IMAGE" },
+    { label: "Video", value: "VIDEO" },
   ];
 
   const { accounts } = loaderData;
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://mobiles-disco-c-patent.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://bush-treasure-shade-rivers.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
@@ -368,6 +385,26 @@ export default function Index() {
 
   useEffect(() => {
     setIsLoading(false);
+  }, [userData]);
+
+  useEffect(() => {
+    console.log("userData: ", userData);
+    if (userData) {
+      const captionList = userData
+        .map((item) => {
+          if (item.caption !== null) {
+            return {
+              label: item.caption,
+              value: item.caption,
+            };
+          }
+
+          return null;
+        })
+        .filter((item) => item !== null);
+      console.log("captionList: ", captionList);
+      setCaptionList(captionList);
+    }
   }, [userData]);
 
   useEffect(() => {
@@ -394,10 +431,6 @@ export default function Index() {
     submit();
   }, [searchTerm]);
   // end here
-
-  if (userData) {
-    console.log("userData", userData);
-  }
 
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
@@ -440,22 +473,6 @@ export default function Index() {
                 <Text variant={"headingMd"} as={"h2"}>
                   Instagram Posts
                 </Text>
-                {/* <InlineStack gap="200" blockAlign="center">
-                  <Box minWidth="500px">
-                    <TextField
-                      label="Search posts"
-                      value={searchTerm}
-                      labelHidden
-                      placeholder="Search by caption or username"
-                      clearButton
-                      onClearButtonClick={(e) => setSearchTerm("")}
-                      onChange={(value) => setSearchTerm(value)}
-                      autoComplete="on"
-                    />
-                  </Box>
-                  <Select label="Media Type" labelHidden options={options} />
-                </InlineStack> */}
-
                 <Button
                   primary
                   icon={RefreshIcon}
@@ -464,6 +481,9 @@ export default function Index() {
                       refresh: true,
                       selectedAccount: selected,
                     };
+
+                    setIsLoading(true);
+
                     submit(
                       { refreshInstagramPosts: JSON.stringify(payload) },
 
@@ -474,7 +494,12 @@ export default function Index() {
                   Update Posts
                 </Button>
               </InlineStack>
-              <AutocompleteExample />
+              <AutocompleteExample
+                captionList={captionList}
+                filterOptions={options}
+                setInputValue={setSearchTerm}
+                setFilter={setFilter}
+              />
               <Grid>
                 {isLoading &&
                   [...Array(10)].map((_, i) => <SkeletonCard key={i} />)}
