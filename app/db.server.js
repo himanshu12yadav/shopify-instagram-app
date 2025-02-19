@@ -160,10 +160,6 @@ export const storeInstagramPosts = async (posts = [], accountId) => {
         });
       }
     }
-
-    console.log(
-      `Stored ${posts.length} Instagram posts (skipping duplicates).`,
-    );
   } catch (error) {
     console.error("Error storing Instagram posts:", error);
     throw error;
@@ -180,19 +176,32 @@ export const getAllInstagramPostbyAccountId = async (accountId) => {
   });
 };
 
-// export const findInstagramPost = async (instagramUsername) => {
-//   return prisma.instagramAccount.findFirst({
-//     where: {
-//       instagramUsername: instagramUsername,
-//     },
-//     include: {
-//       posts: {
-//         orderBy: {
-//           timestamp: "desc",
-//         },
-//       },
-//     },
-//   });
-// };
+export const getFilteredInstagramPosts = async (searchQuery, filterValue) => {
+  const whereClauses = {
+    OR: [
+      {
+        caption: {
+          contains: searchQuery
+        }
+      },
+      {
+        mediaType: filterValue !== 'all' ? filterValue : undefined
+      }
+    ]
+  }
+
+  if (!searchQuery && filterValue === "all") {
+    return prisma.instagramPost.findMany();
+  }
+
+  const posts = await prisma.instagramPost.findMany({
+    where: whereClauses,
+    include:{
+      account:true
+    }
+  })
+
+  return posts;
+}
 
 export default prisma;

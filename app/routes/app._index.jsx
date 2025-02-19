@@ -145,6 +145,8 @@ export const action = async ({ request }) => {
     storeInstagramPosts,
     findPostById,
     deleteAllPostByAccountId,
+    getFilteredInstagramPosts
+
   } = await import("../db.server.js");
 
   // getting selected account
@@ -157,6 +159,21 @@ export const action = async ({ request }) => {
   const refreshInstagramPosts = JSON.parse(
     formData.get("refreshInstagramPosts"),
   );
+
+  // search query
+  const searchQuery = JSON.parse(formData.get('searchQuery'));
+  console.log("searchQuery: ", searchQuery);
+
+  if (searchQuery) {
+    const search = searchQuery?.searchTerm[0];
+    const filterValue = searchQuery?.fitlerValue;
+    console.log("filterValue: ", filterValue);
+    if (search || filterValue) {
+      const filterResult = await getFilteredInstagramPosts(search, filterValue);
+
+    }
+
+  }
 
   if (refreshInstagramPosts) {
     const { refresh, selectedAccount } = refreshInstagramPosts;
@@ -171,8 +188,6 @@ export const action = async ({ request }) => {
         `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
       );
       const currentPosts = data.data;
-
-      console.log("Current Posts: ", data);
 
       await storeInstagramPosts(currentPosts, id);
 
@@ -231,6 +246,7 @@ function AutocompleteExample({
   captionList,
   filterOptions,
   setInputValue: setSearchTerm,
+  setFilterValue
 }) {
   const deselectedOptions = useMemo(() => [...captionList], [captionList]);
 
@@ -238,7 +254,8 @@ function AutocompleteExample({
   const [inputValue, setLocalInputValue] = useState("");
   const [options, setOptions] = useState(deselectedOptions);
   const [isLoading, setIsLoading] = useState(false);
-  const [filterOption, setFilterOption] = useState("");
+  const [filterOptionLocal, setFilterOptionLocal] = useState("all");
+
 
   const updateText = useCallback(
     (value) => {
@@ -276,6 +293,11 @@ function AutocompleteExample({
     [options],
   );
 
+  const handleFilter = useCallback((value) => {
+    setFilterValue(value);
+    setFilterOptionLocal(value);
+  }, []);
+
   const textField = (
     <Autocomplete.TextField
       onChange={updateText}
@@ -302,11 +324,9 @@ function AutocompleteExample({
           <Select
             label="Filter by type"
             labelHidden
-            value={filterOption}
+            value={filterOptionLocal}
             options={filterOptions}
-            onChange={(value) => {
-              setFilterOption(value);
-            }}
+            onChange={handleFilter}
             tone="magic"
           />
         </div>
@@ -362,7 +382,7 @@ export default function Index() {
   // search filter states
   const [captionList, setCaptionList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filterValue, setFilterValue] = useState("all");
 
   const options = [
     { label: "All", value: "all" },
@@ -373,7 +393,7 @@ export default function Index() {
   const { accounts } = loaderData;
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://bush-treasure-shade-rivers.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://entities-latex-plains-forbidden.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
@@ -388,7 +408,6 @@ export default function Index() {
   }, [userData]);
 
   useEffect(() => {
-    console.log("userData: ", userData);
     if (userData) {
       const captionList = userData
         .map((item) => {
@@ -427,9 +446,19 @@ export default function Index() {
     setTotalSelectedPost(count);
   }, [userData]);
 
+  // useEffect(() => {
+  //   submit();
+  // }, [searchTerm]);
+
   useEffect(() => {
-    submit();
-  }, [searchTerm]);
+    const payload = {
+      searchTerm,
+      filterValue
+    }
+
+    submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
+
+  }, [searchTerm, filterValue])
   // end here
 
   const handleConnect = () => {
@@ -498,7 +527,7 @@ export default function Index() {
                 captionList={captionList}
                 filterOptions={options}
                 setInputValue={setSearchTerm}
-                setFilter={setFilter}
+                setFilterValue={setFilterValue}
               />
               <Grid>
                 {isLoading &&
