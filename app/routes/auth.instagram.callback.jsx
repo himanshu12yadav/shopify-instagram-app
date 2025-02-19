@@ -18,7 +18,7 @@ export const loader = async ({ request }) => {
       client_secret: "33f126ed6da9cf78907abb35ca28c22e",
       grant_type: "authorization_code",
       redirect_uri:
-        "https://elvis-sharp-charming-chick.trycloudflare.com/auth/instagram/callback",
+        "https://bush-treasure-shade-rivers.trycloudflare.com/auth/instagram/callback",
       code,
     });
 
@@ -75,6 +75,7 @@ export const loader = async ({ request }) => {
     // Redirect to the app or any other page after successful authentication
 
     if (Object.keys(result).length > 0) {
+      console.log("result", result);
       return redirect(
         `https://admin.shopify.com/store/quickstart-7fb02b5e/apps/consumer-app-4/app`,
         {

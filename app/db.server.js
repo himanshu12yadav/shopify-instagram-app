@@ -66,18 +66,70 @@ export const getAllInstagramAccounts = async () => {
   return prisma.instagramAccount.findMany();
 };
 
-export const getAllInstagramAccountsWithPosts = async () => {
-  return prisma.instagramAccount.findMany({
-    include: {
-      instagramPosts: true,
-    },
-  });
-};
-
 export const findUserByInstagramId = async (instagramId) => {
   return prisma.instagramAccount.findUnique({
     where: {
       instagramId: instagramId,
+    },
+  });
+};
+
+export const findUserByInstagramUsername = async (instagramUsername) => {
+  return prisma.instagramAccount.findFirst({
+    where: {
+      instagramUsername: instagramUsername,
+    },
+    include: {
+      posts: true,
+    },
+  });
+};
+
+// all post related functions
+
+export const getPosts = async () => {
+  return prisma.instagramPost.findMany();
+};
+
+export const deleteAllPostByAccountId = async (accountId) => {
+  return prisma.instagramPost.deleteMany({
+    where: {
+      accountId: accountId,
+    },
+  });
+};
+
+export const getAllInstagramPostbyCondition = async (condition) => {
+  try {
+    const posts = await prisma.instagramPost.findMany({
+      include: {
+        account: true,
+      },
+      where: { ...condition },
+    });
+
+    return posts;
+  } catch (error) {
+    console.error("Error fetching Instagram posts:", error);
+    return { error: "Failed to fetch posts", details: error };
+  }
+};
+
+export const findPostById = async (postId) => {
+  return prisma.instagramPost.findUnique({
+    where: {
+      id: postId,
+    },
+  });
+};
+
+export const updatePostData = async (postId, fieldName, fieldValue) => {
+  return prisma.instagramPost.update({
+    where: {
+      id: String(postId),
+    },
+    data: {
+      [fieldName]: fieldValue,
     },
   });
 };
@@ -120,19 +172,27 @@ export const storeInstagramPosts = async (posts = [], accountId) => {
   }
 };
 
-export const findUserByInstagramUsername = async (instagramUsername) => {
-  return prisma.instagramAccount.findFirst({
+export const getAllInstagramPostbyAccountId = async (accountId) => {
+  return prisma.instagramPost.findMany({
     where: {
-      instagramUsername: instagramUsername,
-    },
-    include: {
-      posts: {
-        orderBy: {
-          timestamp: "desc",
-        },
-      },
+      accountId: accountId,
     },
   });
 };
+
+// export const findInstagramPost = async (instagramUsername) => {
+//   return prisma.instagramAccount.findFirst({
+//     where: {
+//       instagramUsername: instagramUsername,
+//     },
+//     include: {
+//       posts: {
+//         orderBy: {
+//           timestamp: "desc",
+//         },
+//       },
+//     },
+//   });
+// };
 
 export default prisma;

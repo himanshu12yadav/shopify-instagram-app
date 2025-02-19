@@ -43,21 +43,23 @@ model InstagramAccount {
   posts                 InstagramPost[]
 }
 
-model InstagramPost {
-  id           String   @id @default(uuid()) // Ensure id has a default UUID for SQLite compatibility
-  mediaType    String
-  mediaUrl     String
+model InstagramPost{
+  id                    String          @id @default(uuid())
+  mediaType   String
+  mediaUrl  String
   thumbnailUrl String?
-  permalink    String
-  timestamp    DateTime
-  username     String
-  caption      String?
-
-  accountId String
-  account   InstagramAccount @relation(fields: [accountId], references: [id])
-
+  permalink String
+  timestamp DateTime
+  username String
+  caption String?
+  accountId String 
+  account InstagramAccount @relation(fields: [accountId], references: [id])
+  selected Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([accountId])
+  @@index([selected])
 }
+
+
