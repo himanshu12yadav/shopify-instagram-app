@@ -166,15 +166,15 @@ export const action = async ({ request }) => {
 
   if (searchQuery) {
     const search = searchQuery?.searchTerm[0];
-    const filterValue = searchQuery?.fitlerValue;
+    const filterValue = searchQuery?.filterValue;
     console.log("filterValue: ", filterValue);
+
     if (search || filterValue) {
       const filterResult = await getFilteredInstagramPosts(search, filterValue);
-
+      console.log("filter: ", filterResult.length);
     }
 
   }
-
   if (refreshInstagramPosts) {
     const { refresh, selectedAccount } = refreshInstagramPosts;
 
