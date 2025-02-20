@@ -292,6 +292,8 @@ export const action = async ({ request }) => {
   // getting selected account
   const selectedAccount = JSON.parse(formData.get("selectedAccount"));
 
+  console.log("search: ", selectedAccount?.account);
+
   // getting checked post
   const checkedPost = JSON.parse(formData.get("checkedPost"));
 
@@ -304,26 +306,24 @@ export const action = async ({ request }) => {
   const searchQuery = JSON.parse(formData.get('searchQuery'));
 
 
-  if (searchQuery) {
-    const search = searchQuery?.searchTerm[0];
-    const filterValue = searchQuery?.filterValue;
-    const username = Object.keys(searchQuery?.selected).length > 0 ? searchQuery?.selected : null;
-    const pageSize = searchQuery?.pageSize;
-    const cursor = searchQuery?.cursor;
-    console.log("searchQuery: ", Object.keys(searchQuery));
+  // if (searchQuery) {
+  //   const search = searchQuery?.searchTerm[0];
+  //   const filterValue = searchQuery?.filterValue;
+  //   const username = Object.keys(searchQuery?.selected).length > 0 ? searchQuery?.selected : null;
 
 
-    if (username && (search || filterValue !== 'all')) {
-      const filterResult = await getFilteredInstagramPosts(search, filterValue, username, pageSize, cursor);
 
-      return { data: filterResult }
+  //   if (username && (search || filterValue !== 'all')) {
+  //     const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
 
-    } else if (username && (search || filterValue == 'all')) {
-      const filterResult = await getFilteredInstagramPosts(search, filterValue, username, pageSize, cursor);
+  //     return { data: filterResult }
 
-      return { data: filterResult }
-    }
-  }
+  //   } else if (username && (search || filterValue == 'all')) {
+  //     const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
+
+  //     return { data: filterResult }
+  //   }
+  // }
 
   // refresh Instagran post
   if (refreshInstagramPosts) {
@@ -371,11 +371,9 @@ export const action = async ({ request }) => {
     const dbUsername = await findUserByInstagramUsername(selectedAccount?.account);
     const accessToken = dbUsername?.instagramToken;
 
-    console.log("dfsdfsdd");
-
     if (dbUsername.posts.length > 0) {
-      console.log("selected: ", selectedAccount?.pageSize);
-      const posts = await getAllInstagramPostbyAccountId(dbUsername.id, selectedAccount?.pageSize);
+
+      const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
 
       return {
         data: posts,
@@ -397,7 +395,6 @@ export const action = async ({ request }) => {
 };
 
 
-
 export default function Index() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
@@ -414,9 +411,6 @@ export default function Index() {
   const [captionList, setCaptionList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterValue, setFilterValue] = useState("all");
-  const pageSize = 12;
-
-  const [cursor, setCursor] = useState(null)
 
   const options = [
     { label: "All", value: "all" },
@@ -439,13 +433,10 @@ export default function Index() {
 
   useEffect(() => {
     setUserData(actionData?.data);
-    setCursor(actionData?.data[actionData?.data.length - 1]?.id)
   }, [actionData]);
 
 
-  if (cursor) {
-    console.log("cursor: ", cursor);
-  }
+
 
   useEffect(() => {
     setIsLoading(false);
@@ -476,11 +467,11 @@ export default function Index() {
       setCaptionList([]);
     }
     const payload = {
-      account: selected,
-      pageSize: pageSize
+      account: selected
     }
 
-    console.log("change uesrname");
+    console.log("selected: ", payload);
+
     submit({ selectedAccount: JSON.stringify(payload) }, { method: "POST" });
   }, [selected, submit]);
 
@@ -501,18 +492,16 @@ export default function Index() {
 
 
   useEffect(() => {
-    console.log("filter change")
+
     const payload = {
       selected,
       searchTerm,
-      filterValue,
-      pageSize,
-      cursor
+      filterValue
     }
 
     submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
 
-  }, [searchTerm, filterValue])
+  }, [searchTerm])
   // end here
 
   const handleConnect = () => {
@@ -661,12 +650,7 @@ export default function Index() {
                   ))}
               </Grid>
               <div style={{ display: "flex", justifyContent: "center" }}>
-                <Pagination
-                  hasPrevious={cursor !== null}
-                  hasNext={userData?.length === pageSize}
-                  onPrevious={handlePreviousPage}
-                  onNext={handleNextPage}
-                />
+                <Pagination />
               </div>
             </BlockStack>
           </Card>

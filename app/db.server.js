@@ -168,20 +168,15 @@ export const storeInstagramPosts = async (posts = [], accountId) => {
   }
 };
 
-export const getAllInstagramPostbyAccountId = async (accountId, pageSize) => {
+export const getAllInstagramPostbyAccountId = async (accountId) => {
   return prisma.instagramPost.findMany({
     where: {
       accountId: accountId,
-    },
-    take: pageSize,
-    skip: cursor ? 1 : 0,
-    orderBy: {
-      id: 'asc'
     }
   });
 };
 
-export const getFilteredInstagramPosts = async (searchQuery, filterValue, username, pageSize, cursor) => {
+export const getFilteredInstagramPosts = async (searchQuery, filterValue, username) => {
   const whereClauses = {
     AND: [
       {
@@ -208,11 +203,7 @@ export const getFilteredInstagramPosts = async (searchQuery, filterValue, userna
       include: {
         account: true
       },
-      take: pageSize,
-      skip: cursor ? 1 : 0,
-      orderBy: {
-        id: 'asc'
-      }
+
     });
   }
 
@@ -221,11 +212,6 @@ export const getFilteredInstagramPosts = async (searchQuery, filterValue, userna
     include: {
       account: true
     },
-    take: pageSize,
-    skip: cursor ? 1 : 0,
-    orderBy: {
-      id: 'asc'
-    }
   })
 
   console.log("Posts: ", posts);
