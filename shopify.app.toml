@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-application_url = "https://entities-latex-plains-forbidden.trycloudflare.com"
+application_url = "https://scanner-warranty-bali-take.trycloudflare.com"
 client_id = "769d7b3b0d233f22f819e8a9f853c1be"
 embedded = true
 handle = "consumer-app-4"
@@ -23,11 +23,11 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://entities-latex-plains-forbidden.trycloudflare.com/auth/callback",
-  "https://entities-latex-plains-forbidden.trycloudflare.com/auth/shopify/callback",
-  "https://entities-latex-plains-forbidden.trycloudflare.com/api/auth/callback",
-  "https://entities-latex-plains-forbidden.trycloudflare.com/auth/instagram/callback",
-  "https://entities-latex-plains-forbidden.trycloudflare.com/api/fetchPosts"
+  "https://scanner-warranty-bali-take.trycloudflare.com/auth/callback",
+  "https://scanner-warranty-bali-take.trycloudflare.com/auth/shopify/callback",
+  "https://scanner-warranty-bali-take.trycloudflare.com/api/auth/callback",
+  "https://scanner-warranty-bali-take.trycloudflare.com/auth/instagram/callback",
+  "https://scanner-warranty-bali-take.trycloudflare.com/api/fetchPosts"
 ]
 
 [pos]

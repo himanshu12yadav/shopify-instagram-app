@@ -50,6 +50,146 @@ export const loader = async ({ request }) => {
   return json({ accounts });
 };
 
+// component function
+
+function AutocompleteExample({
+  captionList,
+  filterOptions,
+  setInputValue: setSearchTerm,
+  setFilterValue,
+  selectedAccount
+}) {
+
+  const deselectedOptions = useMemo(() => [...captionList], [captionList]);
+  const [selectedOptions, setSelectedOptions] = useState("");
+  const [inputValue, setLocalInputValue] = useState("");
+  const [options, setOptions] = useState(deselectedOptions);
+  const [isLoading, setIsLoading] = useState(false);
+  const [filterOptionLocal, setFilterOptionLocal] = useState("all");
+  const [textFieldDisable, setTextFieldDisable] = useState(false);
+
+
+  const updateText = useCallback(
+    (value) => {
+      setIsLoading(true);
+      setLocalInputValue(value);
+      if (value === "") {
+        setOptions(deselectedOptions);
+        setSelectedOptions([]);
+        setSearchTerm([])
+      }
+
+      const filterRegx = new RegExp(value, "i");
+      const resultOptions = deselectedOptions.filter((option) =>
+        option.label.match(filterRegx),
+      );
+
+      setOptions(resultOptions);
+      setIsLoading(false);
+    },
+    [deselectedOptions, setSearchTerm, inputValue],
+  );
+
+  const handleSelected = useCallback(
+    (selected) => {
+      const selectedValue = selected.map((selectedItem) => {
+        const matchedOption = options.find((option) =>
+          option.value.match(selectedItem),
+        );
+
+        return matchedOption && matchedOption.label;
+      });
+      setSearchTerm(selectedValue);
+      setSelectedOptions(selectedValue);
+      setLocalInputValue(selectedValue[0] || "");
+    },
+    [options],
+  );
+
+  const handleFilter = useCallback((value) => {
+    setFilterValue(value);
+    setFilterOptionLocal(value);
+  }, []);
+
+  useEffect(() => {
+    if (captionList.length === 0) {
+      setSearchTerm([]);
+      setLocalInputValue("");
+    }
+    setTextFieldDisable(captionList.length === 0);
+
+  }, [captionList, selectedAccount])
+
+  const textField = (
+    <Autocomplete.TextField
+      onChange={updateText}
+      value={inputValue}
+      prefix={<Icon source={SearchIcon} tone="base" />}
+      placeholder="Search"
+      autocomplete="off"
+      disabled={textFieldDisable}
+    />
+  );
+
+  return (
+    <Box gap="400">
+      <InlineStack wrap={false} gap="100" align="start" blockAlign="center">
+        <div style={{ width: "100%" }}>
+          <Autocomplete
+            options={options}
+            selected={selectedOptions}
+            textField={textField}
+            onSelect={handleSelected}
+            loading={isLoading}
+          />
+        </div>
+        <div style={{ width: "100px" }}>
+          <Select
+            label="Filter by type"
+            labelHidden
+            value={filterOptionLocal}
+            options={filterOptions}
+            onChange={handleFilter}
+            tone="magic"
+          />
+        </div>
+      </InlineStack>
+    </Box>
+  );
+}
+
+const SkeletonCard = () => {
+  return (
+    <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}>
+      <div style={{ position: "relative" }}>
+        <BlockStack gap="500">
+          <Box
+            background="bg-subdued"
+            borderRadius="100"
+            width="20px"
+            height="20px"
+            style={{
+              animation:
+                "polaris-SkeletonShimmerAnimation 2.5s linear infinite",
+            }}
+          />
+          <div style={{ width: "100%" }}>
+            <SkeletonThumbnail
+              style={{
+                height: "400px !important",
+                objectFit: "cover",
+                aspectRatio: "1/1",
+              }}
+            />
+          </div>
+
+          <SkeletonBodyText lines={2} />
+        </BlockStack>
+      </div>
+    </Grid.Cell>
+  );
+};
+
 export const SelectComponent = ({ allOption = [], option }) => {
   const [selected, setSelected] = useState({});
   const [options, setOptions] = useState([]);
@@ -150,7 +290,7 @@ export const action = async ({ request }) => {
   } = await import("../db.server.js");
 
   // getting selected account
-  const selectedAccount = formData.get("selectedAccount");
+  const selectedAccount = JSON.parse(formData.get("selectedAccount"));
 
   // getting checked post
   const checkedPost = JSON.parse(formData.get("checkedPost"));
@@ -162,19 +302,30 @@ export const action = async ({ request }) => {
 
   // search query
   const searchQuery = JSON.parse(formData.get('searchQuery'));
-  console.log("searchQuery: ", searchQuery);
+
 
   if (searchQuery) {
     const search = searchQuery?.searchTerm[0];
     const filterValue = searchQuery?.filterValue;
-    console.log("filterValue: ", filterValue);
+    const username = Object.keys(searchQuery?.selected).length > 0 ? searchQuery?.selected : null;
+    const pageSize = searchQuery?.pageSize;
+    const cursor = searchQuery?.cursor;
+    console.log("searchQuery: ", Object.keys(searchQuery));
 
-    if (search || filterValue) {
-      const filterResult = await getFilteredInstagramPosts(search, filterValue);
-      console.log("filter: ", filterResult.length);
+
+    if (username && (search || filterValue !== 'all')) {
+      const filterResult = await getFilteredInstagramPosts(search, filterValue, username, pageSize, cursor);
+
+      return { data: filterResult }
+
+    } else if (username && (search || filterValue == 'all')) {
+      const filterResult = await getFilteredInstagramPosts(search, filterValue, username, pageSize, cursor);
+
+      return { data: filterResult }
     }
-
   }
+
+  // refresh Instagran post
   if (refreshInstagramPosts) {
     const { refresh, selectedAccount } = refreshInstagramPosts;
 
@@ -197,6 +348,7 @@ export const action = async ({ request }) => {
     }
   }
 
+  // posted checked for show on website
   if (checkedPost && Object.keys(checkedPost).length > 0) {
     const postId = checkedPost.id;
     const selectionStatus = checkedPost.checked;
@@ -213,13 +365,17 @@ export const action = async ({ request }) => {
     return null;
   }
 
-  if (selectedAccount) {
-    const dbUsername = await findUserByInstagramUsername(selectedAccount);
+
+  // query for selectedAccount
+  if (selectedAccount && Object.keys(selectedAccount).length > 0) {
+    const dbUsername = await findUserByInstagramUsername(selectedAccount?.account);
     const accessToken = dbUsername?.instagramToken;
 
+    console.log("dfsdfsdd");
+
     if (dbUsername.posts.length > 0) {
-      console.log("posts", dbUsername.posts);
-      const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
+      console.log("selected: ", selectedAccount?.pageSize);
+      const posts = await getAllInstagramPostbyAccountId(dbUsername.id, selectedAccount?.pageSize);
 
       return {
         data: posts,
@@ -240,132 +396,7 @@ export const action = async ({ request }) => {
   return null;
 };
 
-// component function
 
-function AutocompleteExample({
-  captionList,
-  filterOptions,
-  setInputValue: setSearchTerm,
-  setFilterValue
-}) {
-  const deselectedOptions = useMemo(() => [...captionList], [captionList]);
-
-  const [selectedOptions, setSelectedOptions] = useState("");
-  const [inputValue, setLocalInputValue] = useState("");
-  const [options, setOptions] = useState(deselectedOptions);
-  const [isLoading, setIsLoading] = useState(false);
-  const [filterOptionLocal, setFilterOptionLocal] = useState("all");
-
-
-  const updateText = useCallback(
-    (value) => {
-      setIsLoading(true);
-      setLocalInputValue(value);
-
-      if (value === "") {
-        setOptions(deselectedOptions);
-      }
-
-      const filterRegx = new RegExp(value, "i");
-      const resultOptions = deselectedOptions.filter((option) =>
-        option.label.match(filterRegx),
-      );
-
-      setOptions(resultOptions);
-      setIsLoading(false);
-    },
-    [deselectedOptions, setSearchTerm],
-  );
-
-  const handleSelected = useCallback(
-    (selected) => {
-      const selectedValue = selected.map((selectedItem) => {
-        const matchedOption = options.find((option) =>
-          option.value.match(selectedItem),
-        );
-
-        return matchedOption && matchedOption.label;
-      });
-      setSearchTerm(selectedValue);
-      setSelectedOptions(selectedValue);
-      setLocalInputValue(selectedValue[0] || "");
-    },
-    [options],
-  );
-
-  const handleFilter = useCallback((value) => {
-    setFilterValue(value);
-    setFilterOptionLocal(value);
-  }, []);
-
-  const textField = (
-    <Autocomplete.TextField
-      onChange={updateText}
-      value={inputValue}
-      prefix={<Icon source={SearchIcon} tone="base" />}
-      placeholder="Search"
-      autocomplete="off"
-    />
-  );
-
-  return (
-    <Box gap="400">
-      <InlineStack wrap={false} gap="100" align="start" blockAlign="center">
-        <div style={{ width: "100%" }}>
-          <Autocomplete
-            options={options}
-            selected={selectedOptions}
-            textField={textField}
-            onSelect={handleSelected}
-            loading={isLoading}
-          />
-        </div>
-        <div style={{ width: "100px" }}>
-          <Select
-            label="Filter by type"
-            labelHidden
-            value={filterOptionLocal}
-            options={filterOptions}
-            onChange={handleFilter}
-            tone="magic"
-          />
-        </div>
-      </InlineStack>
-    </Box>
-  );
-}
-
-const SkeletonCard = () => {
-  return (
-    <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}>
-      <div style={{ position: "relative" }}>
-        <BlockStack gap="500">
-          <Box
-            background="bg-subdued"
-            borderRadius="100"
-            width="20px"
-            height="20px"
-            style={{
-              animation:
-                "polaris-SkeletonShimmerAnimation 2.5s linear infinite",
-            }}
-          />
-          <div style={{ width: "100%" }}>
-            <SkeletonThumbnail
-              style={{
-                height: "400px !important",
-                objectFit: "cover",
-                aspectRatio: "1/1",
-              }}
-            />
-          </div>
-
-          <SkeletonBodyText lines={2} />
-        </BlockStack>
-      </div>
-    </Grid.Cell>
-  );
-};
 
 export default function Index() {
   const loaderData = useLoaderData();
@@ -383,6 +414,9 @@ export default function Index() {
   const [captionList, setCaptionList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterValue, setFilterValue] = useState("all");
+  const pageSize = 12;
+
+  const [cursor, setCursor] = useState(null)
 
   const options = [
     { label: "All", value: "all" },
@@ -393,15 +427,25 @@ export default function Index() {
   const { accounts } = loaderData;
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://entities-latex-plains-forbidden.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://scanner-warranty-bali-take.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
   // useEffect start here
 
+  if (userData) {
+    console.log("userData: ", userData);
+  }
+
   useEffect(() => {
     setUserData(actionData?.data);
+    setCursor(actionData?.data[actionData?.data.length - 1]?.id)
   }, [actionData]);
+
+
+  if (cursor) {
+    console.log("cursor: ", cursor);
+  }
 
   useEffect(() => {
     setIsLoading(false);
@@ -421,14 +465,23 @@ export default function Index() {
           return null;
         })
         .filter((item) => item !== null);
-      console.log("captionList: ", captionList);
+
       setCaptionList(captionList);
     }
   }, [userData]);
 
   useEffect(() => {
     setIsLoading(true);
-    submit({ selectedAccount: selected }, { method: "POST" });
+    if (!selected) {
+      setCaptionList([]);
+    }
+    const payload = {
+      account: selected,
+      pageSize: pageSize
+    }
+
+    console.log("change uesrname");
+    submit({ selectedAccount: JSON.stringify(payload) }, { method: "POST" });
   }, [selected, submit]);
 
   useEffect(() => {
@@ -438,7 +491,7 @@ export default function Index() {
   useEffect(() => {
     let count = 0;
 
-    if (userData && userData) {
+    if (userData) {
       const totalCount = userData.filter((item) => item.selected).length;
       count = totalCount;
     }
@@ -446,14 +499,15 @@ export default function Index() {
     setTotalSelectedPost(count);
   }, [userData]);
 
-  // useEffect(() => {
-  //   submit();
-  // }, [searchTerm]);
 
   useEffect(() => {
+    console.log("filter change")
     const payload = {
+      selected,
       searchTerm,
-      filterValue
+      filterValue,
+      pageSize,
+      cursor
     }
 
     submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
@@ -467,6 +521,14 @@ export default function Index() {
 
   const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
   const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
+
+  const handlePreviousPage = () => {
+
+  }
+
+  const handleNextPage = () => {
+
+  }
 
   return (
     <Page
@@ -528,6 +590,7 @@ export default function Index() {
                 filterOptions={options}
                 setInputValue={setSearchTerm}
                 setFilterValue={setFilterValue}
+                selectedAccount={selected}
               />
               <Grid>
                 {isLoading &&
@@ -598,7 +661,12 @@ export default function Index() {
                   ))}
               </Grid>
               <div style={{ display: "flex", justifyContent: "center" }}>
-                <Pagination label={2} />
+                <Pagination
+                  hasPrevious={cursor !== null}
+                  hasNext={userData?.length === pageSize}
+                  onPrevious={handlePreviousPage}
+                  onNext={handleNextPage}
+                />
               </div>
             </BlockStack>
           </Card>
