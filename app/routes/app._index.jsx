@@ -21,7 +21,7 @@ import {
   SkeletonDisplayText,
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@shopify/app-bridge-react";
 
 import { RefreshIcon } from "@shopify/polaris-icons";
@@ -42,6 +42,8 @@ import {
   updatePostData,
 } from "../db.server.js";
 
+import { ClientOnly } from "../hooks/useHydrated.jsx";
+
 // loader function
 export const loader = async ({ request }) => {
   const { getAllInstagramAccounts } = await import("../db.server.js");
@@ -57,37 +59,54 @@ function AutocompleteExample({
   filterOptions,
   setInputValue: setSearchTerm,
   setFilterValue,
-  selectedAccount
+  selectedAccount,
+  searchTerm
 }) {
 
-  const deselectedOptions = useMemo(() => [...captionList], [captionList]);
+  const deselectedOptions = useMemo(() => [{ label: 'A', value: 'A' }, { label: 'AA', value: 'AA' }, { label: 'B', value: 'B' }, { label: 'C', value: 'C' }], []);
   const [selectedOptions, setSelectedOptions] = useState("");
   const [inputValue, setLocalInputValue] = useState("");
   const [options, setOptions] = useState(deselectedOptions);
   const [isLoading, setIsLoading] = useState(false);
   const [filterOptionLocal, setFilterOptionLocal] = useState("all");
-  const [textFieldDisable, setTextFieldDisable] = useState(false);
 
+  const lastInputValue = useRef("");
+
+  useEffect(() => {
+    if (searchTerm?.length > 0) {
+      setSelectedOptions(searchTerm);
+      setLocalInputValue(searchTerm[0]);
+    }
+  }, [deselectedOptions, searchTerm])
+
+
+  useEffect(() => {
+    if (lastInputValue.current) {
+      setLocalInputValue(lastInputValue.current);
+    }
+  }, [])
 
   const updateText = useCallback(
     (value) => {
       setIsLoading(true);
       setLocalInputValue(value);
+      lastInputValue.current = value;
       if (value === "") {
         setOptions(deselectedOptions);
         setSelectedOptions([]);
-        setSearchTerm([])
+        return;
       }
 
       const filterRegx = new RegExp(value, "i");
       const resultOptions = deselectedOptions.filter((option) =>
         option.label.match(filterRegx),
       );
-
+      setSearchTerm(value);
       setOptions(resultOptions);
       setIsLoading(false);
     },
-    [deselectedOptions, setSearchTerm, inputValue],
+
+    [deselectedOptions, setSearchTerm],
   );
 
   const handleSelected = useCallback(
@@ -99,11 +118,13 @@ function AutocompleteExample({
 
         return matchedOption && matchedOption.label;
       });
+
       setSearchTerm(selectedValue);
       setSelectedOptions(selectedValue);
       setLocalInputValue(selectedValue[0] || "");
+
     },
-    [options],
+    [options, setSearchTerm],
   );
 
   const handleFilter = useCallback((value) => {
@@ -111,14 +132,6 @@ function AutocompleteExample({
     setFilterOptionLocal(value);
   }, []);
 
-  useEffect(() => {
-    if (captionList.length === 0) {
-      setSearchTerm([]);
-      setLocalInputValue("");
-    }
-    setTextFieldDisable(captionList.length === 0);
-
-  }, [captionList, selectedAccount])
 
   const textField = (
     <Autocomplete.TextField
@@ -127,7 +140,6 @@ function AutocompleteExample({
       prefix={<Icon source={SearchIcon} tone="base" />}
       placeholder="Search"
       autocomplete="off"
-      disabled={textFieldDisable}
     />
   );
 
@@ -306,24 +318,24 @@ export const action = async ({ request }) => {
   const searchQuery = JSON.parse(formData.get('searchQuery'));
 
 
-  // if (searchQuery) {
-  //   const search = searchQuery?.searchTerm[0];
-  //   const filterValue = searchQuery?.filterValue;
-  //   const username = Object.keys(searchQuery?.selected).length > 0 ? searchQuery?.selected : null;
+  if (searchQuery) {
+    const search = searchQuery?.searchTerm[0];
+    const filterValue = searchQuery?.filterValue;
+    const username = Object.keys(searchQuery?.selected).length > 0 ? searchQuery?.selected : null;
 
 
 
-  //   if (username && (search || filterValue !== 'all')) {
-  //     const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
+    if (username && (search || filterValue !== 'all')) {
+      const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
 
-  //     return { data: filterResult }
+      return { data: filterResult }
 
-  //   } else if (username && (search || filterValue == 'all')) {
-  //     const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
+    } else if (username && (search || filterValue == 'all')) {
+      const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
 
-  //     return { data: filterResult }
-  //   }
-  // }
+      return { data: filterResult }
+    }
+  }
 
   // refresh Instagran post
   if (refreshInstagramPosts) {
@@ -421,28 +433,42 @@ export default function Index() {
   const { accounts } = loaderData;
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://scanner-warranty-bali-take.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://wx-ballot-nomination-emperor.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
   // useEffect start here
 
-  if (userData) {
-    console.log("userData: ", userData);
+  const handleSearch = (value) => {
+    let payload = null;
+    if (value.length > 0) {
+      setSearchTerm(value);
+      payload = {
+        selected,
+        searchTerm: value,
+        filterValue
+      }
+    } else {
+      payload = {
+        selected,
+        searchTerm: "",
+        filterValue
+      }
+    }
+
+
+    submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" })
   }
+
+
 
   useEffect(() => {
     setUserData(actionData?.data);
   }, [actionData]);
 
 
-
-
   useEffect(() => {
     setIsLoading(false);
-  }, [userData]);
-
-  useEffect(() => {
     if (userData) {
       const captionList = userData
         .map((item) => {
@@ -491,19 +517,6 @@ export default function Index() {
   }, [userData]);
 
 
-  useEffect(() => {
-
-    const payload = {
-      selected,
-      searchTerm,
-      filterValue
-    }
-
-    submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
-
-  }, [searchTerm])
-  // end here
-
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
   };
@@ -511,13 +524,7 @@ export default function Index() {
   const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
   const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
 
-  const handlePreviousPage = () => {
 
-  }
-
-  const handleNextPage = () => {
-
-  }
 
   return (
     <Page
@@ -577,9 +584,10 @@ export default function Index() {
               <AutocompleteExample
                 captionList={captionList}
                 filterOptions={options}
-                setInputValue={setSearchTerm}
+                setInputValue={handleSearch}
                 setFilterValue={setFilterValue}
                 selectedAccount={selected}
+                searchTerm={searchTerm}
               />
               <Grid>
                 {isLoading &&
@@ -674,16 +682,19 @@ export default function Index() {
             </BlockStack>
           </FooterHelp>
         </Layout.Section>
-        <Modal open={open} onHide={handleModalClose} variant={"large"}>
-          <Box
-            padding={"200"}
-            style={{ paddingTop: "20px", paddingBottom: "20px" }}
-          >
-            <BlockStack gap="100" style={{ maxWidth: "800px", margin: "auto" }}>
-              <ModalGridComponent posts={userData} />
-            </BlockStack>
-          </Box>
-        </Modal>
+        <ClientOnly>
+          <Modal open={open} onHide={handleModalClose} variant={"large"}>
+            <Box
+              padding={"200"}
+              style={{ paddingTop: "20px", paddingBottom: "20px" }}
+            >
+              <BlockStack gap="100" style={{ maxWidth: "800px", margin: "auto" }}>
+                <ModalGridComponent posts={userData} />
+              </BlockStack>
+            </Box>
+          </Modal>
+        </ClientOnly>
+
       </Layout>
     </Page>
   );
