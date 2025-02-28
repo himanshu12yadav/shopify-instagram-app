@@ -1,7 +1,6 @@
 import {
   Button,
   Page,
-  Select,
   Layout,
   Card,
   BlockStack,
@@ -14,20 +13,20 @@ import {
   Checkbox,
   InlineStack,
   Badge,
-  Box,
-  TextField,
-  SkeletonThumbnail,
-  SkeletonBodyText,
-  SkeletonDisplayText,
+  Box
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@shopify/app-bridge-react";
 
-import { RefreshIcon } from "@shopify/polaris-icons";
+import  ModalGridComponent  from "../components/ModalGridComponent.jsx";
+import { SelectComponent } from "../components/SelectComponent.jsx";
+import { SkeletonCard } from "../components/SkeletonCard.jsx";
+import { AutoComplete } from "../components/AutoComplete.jsx";
 
-import { SearchIcon } from "@shopify/polaris-icons";
-import { Autocomplete, Icon } from "@shopify/polaris";
+import { RefreshIcon } from "@shopify/polaris-icons";
+import  debounce from "lodash/debounce";
+
 
 import {
   Link,
@@ -42,6 +41,8 @@ import {
   updatePostData,
 } from "../db.server.js";
 
+import { ClientOnly } from "../hooks/useHydrated.jsx";
+
 // loader function
 export const loader = async ({ request }) => {
   const { getAllInstagramAccounts } = await import("../db.server.js");
@@ -50,91 +51,6 @@ export const loader = async ({ request }) => {
   return json({ accounts });
 };
 
-export const SelectComponent = ({ allOption = [], option }) => {
-  const [selected, setSelected] = useState({});
-  const [options, setOptions] = useState([]);
-
-  useEffect(() => {
-    let options = allOption?.map((item) => ({
-      value: item.instagramUsername,
-      label: item.instagramUsername,
-    }));
-
-    if (options.length > 0) {
-      options.unshift({ label: "Select an option", value: "" });
-    } else {
-      options = [{ label: "No option", value: "" }];
-    }
-
-    setOptions(options);
-  }, [allOption]);
-
-  const handleSelectChange = useCallback(
-    (value) => {
-      setSelected(value);
-      option(value);
-    },
-    [selected],
-  );
-
-  return (
-    <Select
-      label="Username"
-      options={options}
-      onChange={handleSelectChange}
-      value={selected}
-    />
-  );
-};
-
-const ModalGridComponent = ({ posts }) => {
-  return (
-    <Grid>
-      {posts
-        ?.filter((post) => post.selected)
-        .map((post) => (
-          <Grid.Cell
-            key={post.id}
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-            columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}
-          >
-            <MediaCard
-              portrait
-              title={post.username}
-              description={post.caption || "No captoin"}
-              style={{
-                maxWidth: "100%",
-              }}
-            >
-              {post.mediaType === "VIDEO" ? (
-                <VideoThumbnail
-                  videoLength={0}
-                  thumbnailUrl={post.thumbnailUrl}
-                  onClick={() => window.open(post.permalink, "_blank")}
-                />
-              ) : (
-                <img
-                  src={post.mediaUrl || post.thumbnailUrl}
-                  alt={post.caption || "Instagram post"}
-                  style={{
-                    width: "100%",
-                    height: "auto",
-                    objectFit: "cover",
-                    aspectRatio: "10px",
-                  }}
-                  onClick={() => window.open(post.permalink, "_blank")}
-                />
-              )}
-            </MediaCard>
-          </Grid.Cell>
-        ))}
-    </Grid>
-  );
-};
 
 // action function
 export const action = async ({ request }) => {
@@ -145,10 +61,13 @@ export const action = async ({ request }) => {
     storeInstagramPosts,
     findPostById,
     deleteAllPostByAccountId,
+    getFilteredInstagramPosts
+
   } = await import("../db.server.js");
 
   // getting selected account
-  const selectedAccount = formData.get("selectedAccount");
+  const selectedAccount = JSON.parse(formData.get("selectedAccount"));
+
 
   // getting checked post
   const checkedPost = JSON.parse(formData.get("checkedPost"));
@@ -158,6 +77,40 @@ export const action = async ({ request }) => {
     formData.get("refreshInstagramPosts"),
   );
 
+  // search query
+  const searchQuery = JSON.parse(formData.get('searchQuery'));
+
+
+  if (searchQuery) {
+    const search = searchQuery?.searchTerm[0];
+    const filterValue = searchQuery?.filterValue;
+    const username = Object.keys(searchQuery?.selected).length > 0 ? searchQuery?.selected : null;
+
+    console.log("search Query: ",searchQuery);
+
+    if (username && (search || filterValue !== 'all')) {
+      const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
+
+      const captionLists = filterResult.map((post) => ({
+        label: post.caption == null ? "No caption" : post.caption,
+        value: post.caption,
+      })).filter((item) => item.value !== null);
+
+      return { data: filterResult, captionLists }
+
+    } else if (username && (search || filterValue == 'all')) {
+      const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
+
+      const captionLists = filterResult.map((post) => ({
+        label: post.caption == null ? "No caption" : post.caption,
+        value: post.caption,
+      })).filter((item) => item.value !== null);
+
+      return { data: filterResult, captionLists }
+    }
+  }
+
+  // refresh Instagran post
   if (refreshInstagramPosts) {
     const { refresh, selectedAccount } = refreshInstagramPosts;
 
@@ -172,16 +125,23 @@ export const action = async ({ request }) => {
       );
       const currentPosts = data.data;
 
-      console.log("Current Posts: ", data);
-
       await storeInstagramPosts(currentPosts, id);
+
+      const captionLists = currentPosts.map((post) => ({
+        label: post.caption == null ? "No caption" : post.caption,
+        value: post.caption,
+      })).filter((item) => item.value !== null);
+
+      console.log(captionLists)
 
       return {
         data: await getAllInstagramPostbyAccountId(id),
+        captionLists
       };
     }
   }
 
+  // posted checked for show on website
   if (checkedPost && Object.keys(checkedPost).length > 0) {
     const postId = checkedPost.id;
     const selectionStatus = checkedPost.checked;
@@ -190,24 +150,42 @@ export const action = async ({ request }) => {
     if (postId && currentPost.id) {
       const { account } = currentPost;
       await updatePostData(currentPost.id, "selected", selectionStatus);
+      const posts = await getAllInstagramPostbyAccountId(account);
+
+      const captionLists = posts.map((post) => ({
+        label: post.caption == null ? "No caption" : post.caption,
+        value: post.caption,
+      })).filter((item) => item.value !== null);
+
       return {
         data: await getAllInstagramPostbyAccountId(account),
+        captionLists
       };
     }
 
     return null;
   }
 
-  if (selectedAccount) {
-    const dbUsername = await findUserByInstagramUsername(selectedAccount);
+
+  // query for selectedAccount
+  if (selectedAccount && Object.keys(selectedAccount).length > 0) {
+    const dbUsername = await findUserByInstagramUsername(selectedAccount?.account);
     const accessToken = dbUsername?.instagramToken;
 
+    if (!dbUsername) return null;
+
     if (dbUsername.posts.length > 0) {
-      console.log("posts", dbUsername.posts);
+
       const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
+
+      const captionLists = posts.map((post) => ({
+        label: post.caption == null ? "No caption" : post.caption,
+        value: post.caption,
+      })).filter((item) => item.value !== null);
 
       return {
         data: posts,
+        captionLists
       };
     }
 
@@ -225,127 +203,6 @@ export const action = async ({ request }) => {
   return null;
 };
 
-// component function
-
-function AutocompleteExample({
-  captionList,
-  filterOptions,
-  setInputValue: setSearchTerm,
-}) {
-  const deselectedOptions = useMemo(() => [...captionList], [captionList]);
-
-  const [selectedOptions, setSelectedOptions] = useState("");
-  const [inputValue, setLocalInputValue] = useState("");
-  const [options, setOptions] = useState(deselectedOptions);
-  const [isLoading, setIsLoading] = useState(false);
-  const [filterOption, setFilterOption] = useState("");
-
-  const updateText = useCallback(
-    (value) => {
-      setIsLoading(true);
-      setLocalInputValue(value);
-
-      if (value === "") {
-        setOptions(deselectedOptions);
-      }
-
-      const filterRegx = new RegExp(value, "i");
-      const resultOptions = deselectedOptions.filter((option) =>
-        option.label.match(filterRegx),
-      );
-
-      setOptions(resultOptions);
-      setIsLoading(false);
-    },
-    [deselectedOptions, setSearchTerm],
-  );
-
-  const handleSelected = useCallback(
-    (selected) => {
-      const selectedValue = selected.map((selectedItem) => {
-        const matchedOption = options.find((option) =>
-          option.value.match(selectedItem),
-        );
-
-        return matchedOption && matchedOption.label;
-      });
-      setSearchTerm(selectedValue);
-      setSelectedOptions(selectedValue);
-      setLocalInputValue(selectedValue[0] || "");
-    },
-    [options],
-  );
-
-  const textField = (
-    <Autocomplete.TextField
-      onChange={updateText}
-      value={inputValue}
-      prefix={<Icon source={SearchIcon} tone="base" />}
-      placeholder="Search"
-      autocomplete="off"
-    />
-  );
-
-  return (
-    <Box gap="400">
-      <InlineStack wrap={false} gap="100" align="start" blockAlign="center">
-        <div style={{ width: "100%" }}>
-          <Autocomplete
-            options={options}
-            selected={selectedOptions}
-            textField={textField}
-            onSelect={handleSelected}
-            loading={isLoading}
-          />
-        </div>
-        <div style={{ width: "100px" }}>
-          <Select
-            label="Filter by type"
-            labelHidden
-            value={filterOption}
-            options={filterOptions}
-            onChange={(value) => {
-              setFilterOption(value);
-            }}
-            tone="magic"
-          />
-        </div>
-      </InlineStack>
-    </Box>
-  );
-}
-
-const SkeletonCard = () => {
-  return (
-    <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 3, lg: 3 }}>
-      <div style={{ position: "relative" }}>
-        <BlockStack gap="500">
-          <Box
-            background="bg-subdued"
-            borderRadius="100"
-            width="20px"
-            height="20px"
-            style={{
-              animation:
-                "polaris-SkeletonShimmerAnimation 2.5s linear infinite",
-            }}
-          />
-          <div style={{ width: "100%" }}>
-            <SkeletonThumbnail
-              style={{
-                height: "400px !important",
-                objectFit: "cover",
-                aspectRatio: "1/1",
-              }}
-            />
-          </div>
-
-          <SkeletonBodyText lines={2} />
-        </BlockStack>
-      </div>
-    </Grid.Cell>
-  );
-};
 
 export default function Index() {
   const loaderData = useLoaderData();
@@ -362,7 +219,8 @@ export default function Index() {
   // search filter states
   const [captionList, setCaptionList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filterValue, setFilterValue] = useState("all");
+
 
   const options = [
     { label: "All", value: "all" },
@@ -372,15 +230,61 @@ export default function Index() {
 
   const { accounts } = loaderData;
 
+    useEffect(()=>{
+      console.log("actionData: ", actionData);
+    },[actionData]);
+
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://bush-treasure-shade-rivers.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://patrol-kenya-invitation-detector.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
   // useEffect start here
 
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value) => {
+        const payload = {
+          selected,
+          searchTerm: value || "",
+          filterValue
+        };
+        submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
+      }, 3000),
+    [selected, filterValue]
+  );
+
+const handleSearch = (value)=>{
+  setSearchTerm(value);
+  if (value.length >= 2) { // Only search with 2+ characters
+    debouncedSearch(value);
+  }
+}
+
+  // const handleSearch = (value) => {
+  //   let payload = null;
+  //   if (value.length > 0) {
+  //     setSearchTerm(value);
+  //     payload = {
+  //       selected,
+  //       searchTerm: value,
+  //       filterValue
+  //     }
+  //   } else {
+  //     payload = {
+  //       selected,
+  //       searchTerm: "",
+  //       filterValue
+  //     }
+  //   }
+  //   submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" })
+  // }
+
+
+
   useEffect(() => {
     setUserData(actionData?.data);
+    setCaptionList(actionData?.captionLists);
   }, [actionData]);
 
   useEffect(() => {
@@ -388,28 +292,15 @@ export default function Index() {
   }, [userData]);
 
   useEffect(() => {
-    console.log("userData: ", userData);
-    if (userData) {
-      const captionList = userData
-        .map((item) => {
-          if (item.caption !== null) {
-            return {
-              label: item.caption,
-              value: item.caption,
-            };
-          }
-
-          return null;
-        })
-        .filter((item) => item !== null);
-      console.log("captionList: ", captionList);
-      setCaptionList(captionList);
-    }
-  }, [userData]);
-
-  useEffect(() => {
     setIsLoading(true);
-    submit({ selectedAccount: selected }, { method: "POST" });
+    if (!selected) {
+      setCaptionList([]);
+    }
+    const payload = {
+      account: selected
+    }
+
+    submit({ selectedAccount: JSON.stringify(payload) }, { method: "POST" });
   }, [selected, submit]);
 
   useEffect(() => {
@@ -419,7 +310,7 @@ export default function Index() {
   useEffect(() => {
     let count = 0;
 
-    if (userData && userData) {
+    if (userData) {
       const totalCount = userData.filter((item) => item.selected).length;
       count = totalCount;
     }
@@ -427,10 +318,6 @@ export default function Index() {
     setTotalSelectedPost(count);
   }, [userData]);
 
-  useEffect(() => {
-    submit();
-  }, [searchTerm]);
-  // end here
 
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
@@ -438,6 +325,8 @@ export default function Index() {
 
   const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
   const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
+
+
 
   return (
     <Page
@@ -494,11 +383,13 @@ export default function Index() {
                   Update Posts
                 </Button>
               </InlineStack>
-              <AutocompleteExample
+              <AutoComplete
                 captionList={captionList}
                 filterOptions={options}
-                setInputValue={setSearchTerm}
-                setFilter={setFilter}
+                setInputValue={handleSearch}
+                setFilterValue={setFilterValue}
+                selectedAccount={selected}
+                searchTerm={searchTerm}
               />
               <Grid>
                 {isLoading &&
@@ -569,7 +460,7 @@ export default function Index() {
                   ))}
               </Grid>
               <div style={{ display: "flex", justifyContent: "center" }}>
-                <Pagination label={2} />
+                <Pagination />
               </div>
             </BlockStack>
           </Card>
@@ -593,16 +484,19 @@ export default function Index() {
             </BlockStack>
           </FooterHelp>
         </Layout.Section>
-        <Modal open={open} onHide={handleModalClose} variant={"large"}>
-          <Box
-            padding={"200"}
-            style={{ paddingTop: "20px", paddingBottom: "20px" }}
-          >
-            <BlockStack gap="100" style={{ maxWidth: "800px", margin: "auto" }}>
-              <ModalGridComponent posts={userData} />
-            </BlockStack>
-          </Box>
-        </Modal>
+        <ClientOnly>
+          <Modal open={open} onHide={handleModalClose} variant={"large"}>
+            <Box
+              padding={"200"}
+              style={{ paddingTop: "20px", paddingBottom: "20px" }}
+            >
+              <BlockStack gap="100" style={{ maxWidth: "800px", margin: "auto" }}>
+                <ModalGridComponent posts={userData} />
+              </BlockStack>
+            </Box>
+          </Modal>
+        </ClientOnly>
+
       </Layout>
     </Page>
   );
