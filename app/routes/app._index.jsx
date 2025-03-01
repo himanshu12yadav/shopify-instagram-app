@@ -235,7 +235,7 @@ export default function Index() {
     },[actionData]);
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://patrol-kenya-invitation-detector.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://quiet-kansas-tb-bag.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
 
@@ -250,7 +250,7 @@ export default function Index() {
           filterValue
         };
         submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
-      }, 3000),
+      }, 1000),
     [selected, filterValue]
   );
 
@@ -261,24 +261,6 @@ const handleSearch = (value)=>{
   }
 }
 
-  // const handleSearch = (value) => {
-  //   let payload = null;
-  //   if (value.length > 0) {
-  //     setSearchTerm(value);
-  //     payload = {
-  //       selected,
-  //       searchTerm: value,
-  //       filterValue
-  //     }
-  //   } else {
-  //     payload = {
-  //       selected,
-  //       searchTerm: "",
-  //       filterValue
-  //     }
-  //   }
-  //   submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" })
-  // }
 
 
 
