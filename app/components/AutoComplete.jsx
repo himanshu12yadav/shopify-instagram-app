@@ -10,6 +10,7 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 
 
 function AutoComplete({captionList }){
+
     const deselectedOptions = useMemo(()=>[...captionList],[])
     const [selectedOptions, setSelectedOptions] = useState("");
     const [inputValue, setInputValue] = useState("");
