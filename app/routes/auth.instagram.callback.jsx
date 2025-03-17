@@ -18,7 +18,7 @@ export const loader = async ({ request }) => {
       client_secret: "33f126ed6da9cf78907abb35ca28c22e",
       grant_type: "authorization_code",
       redirect_uri:
-        "https://quiet-kansas-tb-bag.trycloudflare.com/auth/instagram/callback",
+        "https://operation-moves-belkin-letting.trycloudflare.com/auth/instagram/callback",
       code,
     });
 
