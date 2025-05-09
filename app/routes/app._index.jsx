@@ -13,20 +13,19 @@ import {
   Checkbox,
   InlineStack,
   Badge,
-  Box
+  Box,
 } from "@shopify/polaris";
 import { json } from "@remix-run/node";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@shopify/app-bridge-react";
 
-import  ModalGridComponent  from "../components/ModalGridComponent.jsx";
+import ModalGridComponent from "../components/ModalGridComponent.jsx";
 import { SelectComponent } from "../components/SelectComponent.jsx";
 import { SkeletonCard } from "../components/SkeletonCard.jsx";
 import { AutoComplete } from "../components/AutoComplete.jsx";
 
 import { RefreshIcon } from "@shopify/polaris-icons";
-import  debounce from "lodash/debounce";
-
+import debounce from "lodash/debounce";
 
 import {
   Link,
@@ -51,6 +50,17 @@ export const loader = async ({ request }) => {
   return json({ accounts });
 };
 
+async function getAllPosts(url) {
+  let allPosts = [];
+
+  while (url) {
+    const { data } = await axios.get(url);
+    allPosts = [...allPosts, ...data.data];
+    url = data.paging?.next || null;
+  }
+
+  return allPosts;
+}
 
 // action function
 export const action = async ({ request }) => {
@@ -61,13 +71,11 @@ export const action = async ({ request }) => {
     storeInstagramPosts,
     findPostById,
     deleteAllPostByAccountId,
-    getFilteredInstagramPosts
-
+    getFilteredInstagramPosts,
   } = await import("../db.server.js");
 
   // getting selected account
   const selectedAccount = JSON.parse(formData.get("selectedAccount"));
-
 
   // getting checked post
   const checkedPost = JSON.parse(formData.get("checkedPost"));
@@ -78,39 +86,52 @@ export const action = async ({ request }) => {
   );
 
   // search query
-  const searchQuery = JSON.parse(formData.get('searchQuery'));
-
+  const searchQuery = JSON.parse(formData.get("searchQuery"));
 
   if (searchQuery) {
     const search = searchQuery?.searchTerm[0];
     const filterValue = searchQuery?.filterValue;
-    const username = Object.keys(searchQuery?.selected).length > 0 ? searchQuery?.selected : null;
+    const username =
+      Object.keys(searchQuery?.selected).length > 0
+        ? searchQuery?.selected
+        : null;
 
-    console.log("search Query: ",searchQuery);
+    if (username && (search || filterValue !== "all")) {
+      console.log("search Query: ", searchQuery);
 
-    if (username && (search || filterValue !== 'all')) {
-      const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
+      const filterResult = await getFilteredInstagramPosts(
+        search,
+        filterValue,
+        username,
+      );
 
-      const captionLists = filterResult.map((post) => ({
-        label: post.caption == null ? "No caption" : post.caption,
-        value: post.caption,
-      })).filter((item) => item.value !== null);
+      const captionLists = filterResult
+        .map((post) => ({
+          label: post.caption == null ? "No caption" : post.caption,
+          value: post.caption,
+        }))
+        .filter((item) => item.value !== null);
 
-      return { data: filterResult, captionLists }
+      return { data: filterResult, captionLists };
+    } else if (username && (search || filterValue === "all")) {
+      const filterResult = await getFilteredInstagramPosts(
+        search,
+        filterValue,
+        username,
+      );
 
-    } else if (username && (search || filterValue == 'all')) {
-      const filterResult = await getFilteredInstagramPosts(search, filterValue, username);
+      const captionLists = filterResult
+        .map((post) => ({
+          label: post.caption == null ? "No caption" : post.caption,
+          value: post.caption,
+        }))
+        .filter((item) => item.value !== "No caption");
 
-      const captionLists = filterResult.map((post) => ({
-        label: post.caption == null ? "No caption" : post.caption,
-        value: post.caption,
-      })).filter((item) => item.value !== null);
-
-      return { data: filterResult, captionLists }
+      return { data: filterResult, captionLists };
     }
   }
 
-  // refresh Instagran post
+  // refresh Instagram post
   if (refreshInstagramPosts) {
     const { refresh, selectedAccount } = refreshInstagramPosts;
 
@@ -120,23 +141,22 @@ export const action = async ({ request }) => {
     if (refresh) {
       await deleteAllPostByAccountId(id);
 
-      const { data } = await axios.get(
-        `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
-      );
-      const currentPosts = data.data;
+      let url = `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`;
+
+      const currentPosts = await getAllPosts(url);
 
       await storeInstagramPosts(currentPosts, id);
 
-      const captionLists = currentPosts.map((post) => ({
-        label: post.caption == null ? "No caption" : post.caption,
-        value: post.caption,
-      })).filter((item) => item.value !== null);
-
-      console.log(captionLists)
+      const captionLists = currentPosts
+        .map((post) => ({
+          label: post.caption == null ? "No caption" : post.caption,
+          value: post.caption,
+        }))
+        .filter((item) => item.value !== null);
 
       return {
         data: await getAllInstagramPostbyAccountId(id),
-        captionLists
+        captionLists,
       };
     }
   }
@@ -152,48 +172,50 @@ export const action = async ({ request }) => {
       await updatePostData(currentPost.id, "selected", selectionStatus);
       const posts = await getAllInstagramPostbyAccountId(account);
 
-      const captionLists = posts.map((post) => ({
-        label: post.caption == null ? "No caption" : post.caption,
-        value: post.caption,
-      })).filter((item) => item.value !== null);
+      const captionLists = posts
+        .map((post) => ({
+          label: post.caption == null ? "No caption" : post.caption,
+          value: post.caption,
+        }))
+        .filter((item) => item.value !== null);
 
       return {
         data: await getAllInstagramPostbyAccountId(account),
-        captionLists
+        captionLists,
       };
     }
 
     return null;
   }
 
-
   // query for selectedAccount
   if (selectedAccount && Object.keys(selectedAccount).length > 0) {
-    const dbUsername = await findUserByInstagramUsername(selectedAccount?.account);
+    const dbUsername = await findUserByInstagramUsername(
+      selectedAccount?.account,
+    );
     const accessToken = dbUsername?.instagramToken;
 
     if (!dbUsername) return null;
 
     if (dbUsername.posts.length > 0) {
-
       const posts = await getAllInstagramPostbyAccountId(dbUsername.id);
 
-      const captionLists = posts.map((post) => ({
-        label: post.caption == null ? "No caption" : post.caption,
-        value: post.caption,
-      })).filter((item) => item.value !== null);
+      const captionLists = posts
+        .map((post) => ({
+          label: post.caption == null ? "No caption" : post.caption,
+          value: post.caption,
+        }))
+        .filter((item) => item.value !== null);
 
       return {
         data: posts,
-        captionLists
+        captionLists,
       };
     }
 
-    const response = await axios.get(
-      `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`,
-    );
+    let url = `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${accessToken}`;
 
-    const posts = await response.data.data;
+    const posts = await getAllPosts(url);
 
     // save data in database
     await storeInstagramPosts(posts, dbUsername.id);
@@ -202,7 +224,6 @@ export const action = async ({ request }) => {
 
   return null;
 };
-
 
 export default function Index() {
   const loaderData = useLoaderData();
@@ -221,7 +242,6 @@ export default function Index() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterValue, setFilterValue] = useState("all");
 
-
   const options = [
     { label: "All", value: "all" },
     { label: "Image", value: "IMAGE" },
@@ -230,16 +250,14 @@ export default function Index() {
 
   const { accounts } = loaderData;
 
-    useEffect(()=>{
-      console.log("actionData: ", actionData);
-    },[actionData]);
+  useEffect(() => {
+    // console.log("actionData: ", actionData);
+  }, [actionData]);
 
   const instagramUrl =
-    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://patrol-kenya-invitation-detector.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+    "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=624455150004028&redirect_uri=https://operation-moves-belkin-letting.trycloudflare.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
 
   const submit = useSubmit();
-
-  // useEffect start here
 
   const debouncedSearch = useMemo(
     () =>
@@ -247,40 +265,77 @@ export default function Index() {
         const payload = {
           selected,
           searchTerm: value || "",
-          filterValue
+          filterValue,
         };
         submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
-      }, 3000),
-    [selected, filterValue]
+      }, 1000),
+    [selected, filterValue],
   );
 
-const handleSearch = (value)=>{
-  setSearchTerm(value);
-  if (value.length >= 2) { // Only search with 2+ characters
-    debouncedSearch(value);
-  }
-}
+  // useEffect start here
 
-  // const handleSearch = (value) => {
-  //   let payload = null;
-  //   if (value.length > 0) {
-  //     setSearchTerm(value);
-  //     payload = {
-  //       selected,
-  //       searchTerm: value,
-  //       filterValue
-  //     }
-  //   } else {
-  //     payload = {
-  //       selected,
-  //       searchTerm: "",
-  //       filterValue
-  //     }
-  //   }
-  //   submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" })
-  // }
+  useEffect(() => {
+    if (Object.keys(selected).length > 0) {
+      debouncedSearch.cancel();
 
+      const payload = {
+        selected,
+        searchTerm: searchTerm || "",
+        filterValue,
+      };
 
+      submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
+    }
+  }, [filterValue, selected]);
+
+  useEffect(() => {
+    // only search if we have a selected account
+    if (Object.keys(selected).length === 0) {
+      return;
+    }
+
+    // if search term is empty and filter is "all" no need for special filtering.
+    if (!searchTerm && filterValue === "all") {
+      return;
+    }
+
+    // Cancel any pending debounced searches
+    debouncedSearch.cancel();
+
+    // create the payload
+    const payload = {
+      selected,
+      searchTerm: searchTerm || "",
+      filterValue,
+    };
+
+    //submit the search
+    submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
+  }, [searchTerm, filterValue, selected, debouncedSearch, submit]);
+
+  // update the handle search function
+  const handleSearch = (value) => {
+    setSearchTerm(value);
+
+    if (!value || value === "") {
+      debouncedSearch.cancel();
+
+      if (Object.keys(selected).length > 0) {
+        const payload = {
+          selected,
+          searchTerm: "",
+          filterValue: "all",
+        };
+        submit({ searchQuery: JSON.stringify(payload) }, { method: "POST" });
+      }
+      return;
+    }
+
+    if (value.length >= 2) {
+      // Only search with 2+ characters
+      debouncedSearch(value);
+    }
+  };
 
   useEffect(() => {
     setUserData(actionData?.data);
@@ -297,8 +352,8 @@ const handleSearch = (value)=>{
       setCaptionList([]);
     }
     const payload = {
-      account: selected
-    }
+      account: selected,
+    };
 
     submit({ selectedAccount: JSON.stringify(payload) }, { method: "POST" });
   }, [selected, submit]);
@@ -318,15 +373,12 @@ const handleSearch = (value)=>{
     setTotalSelectedPost(count);
   }, [userData]);
 
-
   const handleConnect = () => {
     window.top.location.href = instagramUrl;
   };
 
   const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
   const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
-
-
 
   return (
     <Page
@@ -490,13 +542,15 @@ const handleSearch = (value)=>{
               padding={"200"}
               style={{ paddingTop: "20px", paddingBottom: "20px" }}
             >
-              <BlockStack gap="100" style={{ maxWidth: "800px", margin: "auto" }}>
+              <BlockStack
+                gap="100"
+                style={{ maxWidth: "800px", margin: "auto" }}
+              >
                 <ModalGridComponent posts={userData} />
               </BlockStack>
             </Box>
           </Modal>
         </ClientOnly>
-
       </Layout>
     </Page>
   );

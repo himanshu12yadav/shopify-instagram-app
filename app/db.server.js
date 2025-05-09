@@ -172,51 +172,54 @@ export const getAllInstagramPostbyAccountId = async (accountId) => {
   return prisma.instagramPost.findMany({
     where: {
       accountId: accountId,
-    }
+    },
   });
 };
 
-export const getFilteredInstagramPosts = async (searchQuery, filterValue, username) => {
+export const getFilteredInstagramPosts = async (
+  searchQuery,
+  filterValue,
+  username,
+) => {
   const whereClauses = {
     AND: [
       {
         username: username,
       },
-      ...(searchQuery ? [{
-        caption: {
-          contains: searchQuery,
-        },
-      }] : []),
+      ...(searchQuery
+        ? [
+            {
+              caption: {
+                contains: searchQuery,
+              },
+            },
+          ]
+        : []),
       {
-        mediaType: filterValue !== 'all' ? filterValue : undefined,
-      }
+        mediaType: filterValue !== "all" ? filterValue : undefined,
+      },
     ],
   };
 
-
   if (!searchQuery && filterValue === "all") {
-    console.log("hello come here....");
     return prisma.instagramPost.findMany({
       where: {
-        username: username
+        username: username,
       },
       include: {
-        account: true
+        account: true,
       },
-
     });
   }
 
   const posts = await prisma.instagramPost.findMany({
     where: whereClauses,
     include: {
-      account: true
+      account: true,
     },
-  })
-
-  console.log("Posts: ", posts);
+  });
 
   return posts;
-}
+};
 
 export default prisma;

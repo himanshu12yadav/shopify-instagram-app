@@ -1,190 +1,148 @@
-import {
-  Autocomplete,
-  Icon,
-  InlineStack,
-  Select,
-  Box,
-} from "@shopify/polaris";
+import { Autocomplete, Icon, InlineStack, Select, Box } from "@shopify/polaris";
 import { SearchIcon } from "@shopify/polaris-icons";
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 
-// function AutoComplete({
-//   captionList,
-//   filterOptions,
-//   setInputValue: setSearchTerm,
-//   setFilterValue,
-//   selectedAccount,
-//   searchTerm
-// }) {
+function AutoComplete({
+  captionList,
+  filterOptions,
+  setInputValue,
+  setFilterValue,
+  selectedAccount,
+  searchTerm,
+}) {
+  const deselectedOptions = useMemo(
+    () => [...(captionList || [])],
+    [captionList],
+  );
+  const [selectedOptions, setSelectedOptions] = useState("");
+  const [inputValue, setInternalInputValue] = useState(searchTerm || "");
+  const [options, setOptions] = useState(deselectedOptions);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(
+    filterOptions ? filterOptions[0].value : "all",
+  );
 
-//   const deselectedOptions = useMemo(() => [...captionList], []);
-//   const [selectedOptions, setSelectedOptions] = useState("");
-//   const [inputValue, setLocalInputValue] = useState("");
-//   const [options, setOptions] = useState(deselectedOptions);
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [filterOptionLocal, setFilterOptionLocal] = useState("all");
+  // console.log("Input value: ", inputValue);
 
+  // Update internal input state when searchTerm prop changes
+  useEffect(() => {
+    if (searchTerm !== undefined && searchTerm !== inputValue) {
+      setInternalInputValue(searchTerm);
+    }
 
+    if (searchTerm === "") {
+      setSelectedOptions("");
+    }
+  }, [searchTerm]);
 
-//   useEffect(() => {
-//     if (searchTerm?.length > 0) {
-//       setSelectedOptions(searchTerm);
-//       setLocalInputValue(searchTerm[0]);
-//     }
-//   }, [deselectedOptions, searchTerm])
+  // Handle filter change
+  const handleFilterChange = useCallback(
+    (value) => {
+      setSelected(value);
+      if (setFilterValue) {
+        setFilterValue(value);
+      }
+    },
+    [setFilterValue],
+  );
 
+  const updateText = useCallback(
+    (value) => {
+      setInternalInputValue(value);
 
-
-//   const updateText = useCallback(
-//     (value) => {
-//       setIsLoading(true);
-//       setLocalInputValue(value);
-
-//       if (value === "") {
-//         setOptions(deselectedOptions);
-//         setSelectedOptions([]);
-//         return;
-//       }
-
-//       const filterRegx = new RegExp(value, "i");
-//       const resultOptions = deselectedOptions.filter((option) =>
-//         option.label.match(filterRegx),
-//       );
-//       setSearchTerm(value);
-//       setOptions(resultOptions);
-//       setIsLoading(false);
-//     },
-
-//     [deselectedOptions, setSearchTerm],
-//   );
-
-//   const handleSelected = useCallback(
-//     (selected) => {
-//       const selectedValue = selected.map((selectedItem) => {
-//         const matchedOption = options.find((option) =>
-//           option.value.match(selectedItem),
-//         );
-
-//         return matchedOption && matchedOption.label;
-//       });
-
-//       setSearchTerm(selectedValue);
-//       setSelectedOptions(selectedValue);
-//       setLocalInputValue(selectedValue[0] || "");
-
-//     },
-//     [options, setSearchTerm],
-//   );
-
-//   const handleFilter = useCallback((value) => {
-//     setFilterValue(value);
-//     setFilterOptionLocal(value);
-//   }, []);
-
-
-//   const textField = (
-//     <Autocomplete.TextField
-//       onChange={updateText}
-//       value={inputValue}
-//       prefix={<Icon source={SearchIcon} tone="base" />}
-//       placeholder="Search"
-//       autocomplete="on"
-//     />
-//   );
-
-//   return (
-//     <Box gap="400">
-//       <InlineStack wrap={false} gap="100" align="start" blockAlign="center">
-//         <div style={{ width: "100%" }}>
-//           <Autocomplete
-//             options={options}
-//             selected={selectedOptions}
-//             textField={textField}
-//             onSelect={handleSelected}
-//             loading={isLoading}
-//           />
-//         </div>
-//         <div style={{ width: "100px" }}>
-//           <Select
-//             label="Filter by type"
-//             labelHidden
-//             value={filterOptionLocal}
-//             options={filterOptions}
-//             onChange={handleFilter}
-//             tone="magic"
-//           />
-//         </div>
-//       </InlineStack>
-//     </Box>
-//   );
-// }
-
-function AutoComplete({captionList }){
-    const deselectedOptions = useMemo(()=>[...captionList],[])
-    const [selectedOptions, setSelectedOptions] = useState("");
-    const [inputValue, setInputValue] = useState("");
-    const [options, setOptions] = useState(deselectedOptions);
-    const [loading, setLoading] = useState(false);
-
-    console.log(captionList);
-    const updateText = useCallback((value)=>{
+      // Call the parent component's setInputValue
+      if (setInputValue) {
         setInputValue(value);
-        if (!loading){
-            setLoading(true);
+      }
+
+      if (!loading) {
+        setLoading(true);
+      }
+
+      setTimeout(() => {
+        if (value === "") {
+          setOptions(deselectedOptions);
+          setLoading(false);
+          return;
         }
 
-        setTimeout(()=>{
-            if (value == ''){
-                setOptions(deselectedOptions);
-                setLoading(false);
-                return;
-            }
+        const filterRegex = new RegExp(value, "i");
+        const resultOptions = deselectedOptions.filter((option) =>
+          option.label.match(filterRegex),
+        );
 
-            const filterRegex = new RegExp(value, 'i');
-            const resultOptions = deselectedOptions.filter((option)=> option.label.match(filterRegex));
+        setOptions(resultOptions);
+        setLoading(false);
+      }, 300);
+    },
+    [deselectedOptions, loading, setInputValue],
+  );
 
-            setOptions(resultOptions);
-            setLoading(false);
-        }, 300);
-    }, [deselectedOptions, loading]);
+  const updateSelection = useCallback(
+    (selected) => {
+      const selectedText = selected.map((selectedItem) => {
+        const matchedOption = options.find((option) => {
+          return option.value.match(selectedItem);
+        });
 
+        return matchedOption && matchedOption.label;
+      });
 
-    const updateSelection = useCallback((selected)=>{
-        const selectedText = selected.map((selectedItem)=>{
-            const matchedOption = options.find((option)=>{
-                return option.value.match(selectedItem);
-            });
+      setSelectedOptions(selected);
+      setInternalInputValue(selectedText[0] || "");
 
-            return matchedOption && matchedOption.label;
-        })
-
-        setSelectedOptions(selectedText);
+      // Call the parent component's setInputValue
+      if (setInputValue) {
         setInputValue(selectedText[0] || "");
-    }, [options]);
+      }
+    },
+    [options, setInputValue],
+  );
 
-    const textField = (
-        <Autocomplete.TextField
-            onChange={updateText}
-            value={inputValue}
-            prefix={<Icon source={SearchIcon} tone="base"/>}
-            placeholder="Search"
-            autoComplete="off"
-        />
-    );
+  const textField = (
+    <Autocomplete.TextField
+      onChange={updateText}
+      value={inputValue}
+      prefix={<Icon source={SearchIcon} tone="base" />}
+      placeholder="Search captions"
+      autoComplete="off"
+      clearButton
+      onClearButtonClick={() => {
+        setInternalInputValue("");
+        setSelectedOptions("");
+        if (setInputValue) {
+          setInputValue("");
+        }
+      }}
+    />
+  );
 
-    return  (
-        <div>
-            <Autocomplete
-                options={options}
-                selected={selectedOptions}
-                onSelect={updateSelection}
-                loading={loading}
-                textField={textField}
+  return (
+    <div>
+      <InlineStack gap="400" align="start" blockAlign="center">
+        {filterOptions && (
+          <Box minWidth="200px">
+            <Select
+              label="Filter by type"
+              labelHidden
+              options={filterOptions}
+              onChange={handleFilterChange}
+              value={selected}
             />
-
-        </div>
-    )
-
+          </Box>
+        )}
+        <Box style={{ flex: 1 }}>
+          <Autocomplete
+            options={options}
+            selected={selectedOptions}
+            onSelect={updateSelection}
+            loading={loading}
+            textField={textField}
+          />
+        </Box>
+      </InlineStack>
+    </div>
+  );
 }
 
-export {AutoComplete};
+export { AutoComplete };
