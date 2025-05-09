@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-application_url = "https://operation-moves-belkin-letting.trycloudflare.com"
+application_url = "https://citations-utilization-represents-governmental.trycloudflare.com"
 client_id = "769d7b3b0d233f22f819e8a9f853c1be"
 embedded = true
 handle = "consumer-app-4"
@@ -23,11 +23,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://operation-moves-belkin-letting.trycloudflare.com/auth/callback",
-  "https://operation-moves-belkin-letting.trycloudflare.com/auth/shopify/callback",
-  "https://operation-moves-belkin-letting.trycloudflare.com/api/auth/callback",
-  "https://operation-moves-belkin-letting.trycloudflare.com/auth/instagram/callback",
-  "https://operation-moves-belkin-letting.trycloudflare.com/api/fetchPosts"
+  "https://citations-utilization-represents-governmental.trycloudflare.com/auth/callback",
+  "https://citations-utilization-represents-governmental.trycloudflare.com/auth/shopify/callback",
+  "https://citations-utilization-represents-governmental.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
