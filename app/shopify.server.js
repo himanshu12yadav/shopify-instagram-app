@@ -7,15 +7,20 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { BillingInterval } from "@shopify/shopify-api";
+import { getSubscriptionDetails } from "./routes/graphql/query.jsx";
 
 export const MONTHLY_PLAN = "Monthly Plan";
 
 const billingConfig = {
   [MONTHLY_PLAN]: {
-    amount: 10.0,
-    currencyCode: "USD",
-    interval: BillingInterval.Every30Days,
-    trialDays: 7,
+    lineItems: [
+      {
+        amount: 2,
+        currency: "USD",
+        interval: BillingInterval.Every30Days,
+        trialDays: 1,
+      },
+    ],
   },
 };
 
@@ -37,6 +42,34 @@ const shopify = shopifyApp({
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
 });
+
+async function handleSubscriptionUpdate(payload) {
+  const subscriptionId = payload.admin_graphql_api_id;
+
+  if (!subscriptionId) {
+    console.error("No subscription ID in webhook payload");
+    return;
+  }
+
+  const subscription = await getSubscriptionDetails(admin, subscriptionId);
+
+  if (!subscription) {
+    console.error("Failed to fetch subscription details.");
+    return;
+  }
+
+  // update database with retrieved subscription details
+
+  await prisma.subscription.update({
+    where: { shop: payload.myshopify_domain },
+    data: {
+      status: subscription.status,
+      trialEnds: new Date(subscription.trialEndsOn),
+      renewsAt: new Date(subscription.currentPeriodEnd),
+      planId: subscription.lineItems[0].plan.id,
+    },
+  });
+}
 
 export default shopify;
 export const apiVersion = ApiVersion.October24;

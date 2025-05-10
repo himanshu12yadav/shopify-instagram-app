@@ -41,13 +41,51 @@ import {
 } from "../db.server.js";
 
 import { ClientOnly } from "../hooks/useHydrated.jsx";
+import { getSubscriptionStatus } from "./graphql/query.jsx";
+import { authenticate } from "../shopify.server.js";
 
 // loader function
 export const loader = async ({ request }) => {
-  const { getAllInstagramAccounts } = await import("../db.server.js");
-  const accounts = await getAllInstagramAccounts();
+  const { admin, session } = await authenticate.admin(request);
 
-  return json({ accounts });
+  const shop = session.shop.split(".")[0];
+
+  const {
+    data: {
+      currentAppInstallation: { activeSubscriptions },
+    },
+  } = await getSubscriptionStatus(admin.graphql);
+
+  const subscription = activeSubscriptions[0];
+
+  const isPaidSubscripter = subscription?.status === "ACTIVE";
+
+  if (isPaidSubscripter) {
+    const { getAllInstagramAccounts } = await import("../db.server.js");
+
+    const accounts = await getAllInstagramAccounts();
+
+    return json({
+      accounts,
+      hasActiveSubscription: isPaidSubscripter,
+    });
+  }
+
+  // Trial check only if not paid subscriber
+
+  const currentDate = new Date();
+  const trialEndDate = new Date(subscription?.trialDays);
+  const isTrialExpired = currentDate > trialEndDate;
+
+  if (!isTrialExpired) {
+  } else {
+  }
+
+  if (activeSubscriptions && activeSubscriptions.length <= 0) {
+    return {
+      hasActiveSubscription: false,
+    };
+  }
 };
 
 async function getAllPosts(url) {
@@ -248,7 +286,7 @@ export default function Index() {
     { label: "Video", value: "VIDEO" },
   ];
 
-  const { accounts } = loaderData;
+  const { accounts, hasActiveSubscription } = loaderData;
 
   useEffect(() => {
     // console.log("actionData: ", actionData);
@@ -380,7 +418,7 @@ export default function Index() {
   const handleModalOpen = useCallback(() => setIsOpen((prev) => !prev), []);
   const handleModalClose = useCallback(() => setIsOpen((prev) => !prev), []);
 
-  return (
+  return hasActiveSubscription ? (
     <Page
       title="Instagram Integration"
       subtitle="Connect and manage your Instagram business accounts"
@@ -551,6 +589,18 @@ export default function Index() {
             </Box>
           </Modal>
         </ClientOnly>
+      </Layout>
+    </Page>
+  ) : (
+    <Page title="Pricing">
+      <Layout>
+        <Layout.Section>
+          <Card sectioned>
+            <BlockStack gap="4">
+              <Text as={"h4"} variant={"headingMd"}></Text>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
       </Layout>
     </Page>
   );
